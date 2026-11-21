@@ -396,7 +396,7 @@ def render_html_page(
 
     # Build breadcrumb links
     parts = [p for p in rel_path.strip("/").split("/") if p]
-    breadcrumbs_html = '<a href="/" class="crumb-link">🏠 Root</a>'
+    breadcrumbs_html = '<a href="/" class="crumb-link">ðŸ  Root</a>'
     built_path = ""
     for idx, part in enumerate(parts):
         built_path += "/" + quote(part)
@@ -416,7 +416,7 @@ def render_html_page(
             parent_url = "/"
         parent_link_html = f"""
         <a href="{parent_url}" class="card card-parent">
-            <div class="card-icon">📁⬆️</div>
+            <div class="card-icon">ðŸ“â¬†ï¸</div>
             <div class="card-info">
                 <div class="card-title">.. (Parent Directory)</div>
                 <div class="card-meta">Go up one level</div>
@@ -434,12 +434,12 @@ def render_html_page(
         safe_name = html.escape(d.name)
         folders_html.append(f"""
         <a href="{folder_url}" class="card card-folder" data-name="{safe_name.lower()}">
-            <div class="card-icon">📁</div>
+            <div class="card-icon">ðŸ“</div>
             <div class="card-info">
                 <div class="card-title">{safe_name}</div>
                 <div class="card-meta">Folder</div>
             </div>
-            <div class="card-arrow">➔</div>
+            <div class="card-arrow">âž”</div>
         </a>
         """)
 
@@ -466,7 +466,7 @@ def render_html_page(
 
         videos_html.append(f"""
         <div class="card card-video" data-name="{safe_name.lower()}">
-            <div class="card-icon">🎬</div>
+            <div class="card-icon">ðŸŽ¬</div>
             <div class="card-info">
                 <div class="card-title" title="{safe_name}">{safe_name}</div>
                 <div class="card-meta">
@@ -477,13 +477,13 @@ def render_html_page(
             </div>
             <div class="card-actions">
                 <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
-                    ▶ Play
+                    â–¶ Play
                 </button>
                 <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
-                    ⬇
+                    â¬‡
                 </a>
                 <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
-                    🔗 Copy
+                    ðŸ”— Copy
                 </button>
             </div>
         </div>
@@ -916,7 +916,7 @@ def render_html_page(
     <header>
         <div class="header-wrap">
             <div class="logo-group">
-                <div class="logo-icon">🎬</div>
+                <div class="logo-icon">ðŸŽ¬</div>
                 <div>
                     <div class="logo-title">7Stream Media Server</div>
                     <div class="logo-subtitle">Hardware-Accelerated Video Streaming</div>
@@ -924,7 +924,7 @@ def render_html_page(
             </div>
             <div class="header-actions">
                 <a href="{vlc_playlist_url}" class="btn-header" title="Download recursive .m3u playlist for VLC">
-                    📋 Open VLC Playlist (.m3u)
+                    ðŸ“‹ Open VLC Playlist (.m3u)
                 </a>
             </div>
         </div>
@@ -937,7 +937,7 @@ def render_html_page(
 
         <div class="toolbar">
             <div class="search-box">
-                <span class="search-icon">🔍</span>
+                <span class="search-icon">ðŸ”</span>
                 <input type="text" id="filterInput" class="search-input" placeholder="Search videos or folders..." oninput="filterList()">
             </div>
             <div class="stats-badge" id="statsBadge">
@@ -970,7 +970,7 @@ def render_html_page(
             </div>
             <div class="modal-footer">
                 <span>Seeking supported via HTTP 206 Partial Content</span>
-                <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">🔗 Copy Stream Link</button>
+                <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">ðŸ”— Copy Stream Link</button>
             </div>
         </div>
     </div>
@@ -1280,315 +1280,300 @@ class VideoServerManager:
 # 5. Modern Flet Mobile GUI Application
 # ============================================================================
 def build_app(page: ft.Page):
-    page.title = "7Stream - Video Server"
+    page.title = "7Stream"
     page.theme_mode = ft.ThemeMode.DARK
-    page.padding = 16
+    page.bgcolor = "#0d1117"
+    page.padding = 14
     page.scroll = ft.ScrollMode.AUTO
 
     server = VideoServerManager()
     active_mode = "hotspot"  # 'hotspot' or 'wifi'
     current_detected_ip = detect_ip(active_mode)
 
-    # Cross-version Button helper
-    ButtonWidget = getattr(ft, "FilledButton", getattr(ft, "ElevatedButton", ft.Button))
-
-    # Cross-version Styling Helpers
-    def make_border(color, width: float = 1):
-        if hasattr(ft, "Border") and hasattr(ft.Border, "all"):
-            return ft.Border.all(width, color)
-        if hasattr(ft, "border") and hasattr(ft.border, "all"):
-            return ft.border.all(width, color)
-        return None
-
-    def make_padding(top: float = 0, bottom: float = 0, left: float = 0, right: float = 0):
-        if hasattr(ft, "Padding") and hasattr(ft.Padding, "only"):
-            return ft.Padding.only(top=top, bottom=bottom, left=left, right=right)
-        if hasattr(ft, "padding") and hasattr(ft.padding, "only"):
-            return ft.padding.only(top=top, bottom=bottom, left=left, right=right)
-        return None
-
-    def get_alignment_center():
-        if hasattr(ft, "Alignment") and hasattr(ft.Alignment, "CENTER"):
-            return ft.Alignment.CENTER
-        if hasattr(ft, "alignment") and hasattr(ft.alignment, "center"):
-            return ft.alignment.center
-        return ft.Alignment(0, 0)
-
-    # Cross-version Clipboard Service setup
-    clipboard_service = None
-    if hasattr(ft, "Clipboard") and hasattr(page, "services"):
-        clipboard_service = ft.Clipboard()
+    # Safe cross-version border helper
+    def make_border(color, width: float = 1.0):
         try:
-            page.services.append(clipboard_service)
+            if hasattr(ft, "Border"):
+                # Flet 1.x style
+                return ft.Border(
+                    top=ft.BorderSide(width, color),
+                    right=ft.BorderSide(width, color),
+                    bottom=ft.BorderSide(width, color),
+                    left=ft.BorderSide(width, color),
+                )
         except Exception:
             pass
+        return None
 
+    # Safe cross-version padding helper
+    def make_padding(top=0, bottom=0, left=0, right=0):
+        try:
+            return ft.Padding(top=top, bottom=bottom, left=left, right=right)
+        except Exception:
+            return None
+
+    # Safe alignment center
+    def get_alignment_center():
+        try:
+            return ft.alignment.center
+        except Exception:
+            pass
+        try:
+            return ft.Alignment(0, 0)
+        except Exception:
+            return None
+
+    # Snackbar notification
     def notify(msg: str):
-        """Displays a snackbar toast message safely across Flet versions."""
-        sb = ft.SnackBar(content=ft.Text(msg))
-        if hasattr(page, "show_dialog"):
-            try:
-                page.show_dialog(sb)
-                return
-            except Exception:
-                pass
-        if hasattr(page, "snack_bar"):
-            try:
+        try:
+            sb = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#1e293b")
+            if hasattr(page, "snack_bar"):
                 page.snack_bar = sb
                 sb.open = True
                 page.update()
                 return
-            except Exception:
-                pass
-        if hasattr(page, "overlay"):
-            try:
+            if hasattr(page, "overlay"):
                 page.overlay.append(sb)
                 sb.open = True
                 page.update()
-                return
-            except Exception:
-                pass
+        except Exception:
+            pass
 
+    # Clipboard copy
     def copy_to_clipboard(text: str):
-        """Copies text to clipboard across all Flet versions and desktop platforms."""
-        copied = False
-        if hasattr(page, "set_clipboard"):
-            try:
+        try:
+            if hasattr(page, "set_clipboard"):
                 page.set_clipboard(text)
-                copied = True
-            except Exception:
-                pass
-
-        if not copied and clipboard_service is not None:
-            try:
-                if inspect.iscoroutinefunction(clipboard_service.set):
-                    if hasattr(page, "run_task"):
-                        page.run_task(clipboard_service.set, text)
-                        copied = True
-                    else:
-                        asyncio.create_task(clipboard_service.set(text))
-                        copied = True
-                else:
-                    clipboard_service.set(text)
-                    copied = True
-            except Exception:
-                pass
-
+        except Exception:
+            pass
         notify(f"Copied: {text}")
 
-    # Top Status Badge
-    status_icon = ft.Icon(ft.Icons.STOP_CIRCLE_OUTLINED, color=ft.Colors.RED_400, size=20)
-    status_text = ft.Text(
-        "🔴 Server Stopped",
-        color=ft.Colors.RED_400,
-        weight=ft.FontWeight.BOLD,
-        size=15,
-    )
+    # â”€â”€ Status Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    status_dot = ft.Container(width=12, height=12, border_radius=6, bgcolor="#ef4444")
+    status_text = ft.Text("Server Stopped", color="#ef4444", weight=ft.FontWeight.BOLD, size=15)
     status_card = ft.Container(
-        content=ft.Row([status_icon, status_text], alignment=ft.MainAxisAlignment.CENTER),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST,
-        padding=12,
+        content=ft.Row(
+            [status_dot, status_text],
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=10,
+        ),
+        bgcolor="#1a0a0a",
+        padding=ft.Padding(top=12, bottom=12, left=16, right=16),
         border_radius=12,
-        border=make_border(ft.Colors.RED_900),
+        border=make_border("#7f1d1d"),
     )
 
-    # Mode Selector
-    def on_mode_change(e):
+    # â”€â”€ Mode Selector (custom tabs - no SegmentedButton) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # Using simple ElevatedButton pair so there's no serialization risk
+    mode_hotspot_btn = ft.FilledButton(
+        "ðŸ“¡  Hotspot Mode",
+        bgcolor="#1d4ed8",
+        color="#ffffff",
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+        expand=True,
+    )
+    mode_wifi_btn = ft.FilledButton(
+        "ðŸŒ  Wi-Fi Mode",
+        bgcolor="#1e293b",
+        color="#94a3b8",
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+        expand=True,
+    )
+
+    def select_mode(mode: str):
         nonlocal active_mode, current_detected_ip
-        sel = getattr(mode_selector, "selected", None)
-        if sel:
-            active_mode = list(sel)[0] if isinstance(sel, (list, set, tuple)) else str(sel)
+        active_mode = mode
         current_detected_ip = detect_ip(active_mode)
+        if mode == "hotspot":
+            mode_hotspot_btn.bgcolor = "#1d4ed8"
+            mode_hotspot_btn.color = "#ffffff"
+            mode_wifi_btn.bgcolor = "#1e293b"
+            mode_wifi_btn.color = "#94a3b8"
+        else:
+            mode_wifi_btn.bgcolor = "#1d4ed8"
+            mode_wifi_btn.color = "#ffffff"
+            mode_hotspot_btn.bgcolor = "#1e293b"
+            mode_hotspot_btn.color = "#94a3b8"
         update_guide_card()
         update_url_and_qr()
         page.update()
 
-    mode_selector = ft.SegmentedButton(
-        segments=[
-            ft.Segment(
-                value="hotspot",
-                label=ft.Text("Mobile Hotspot (Offline)"),
-                icon=ft.Icon(ft.Icons.WIFI_TETHERING),
-            ),
-            ft.Segment(
-                value="wifi",
-                label=ft.Text("Wi-Fi Router"),
-                icon=ft.Icon(ft.Icons.WIFI),
-            ),
-        ],
-        selected=["hotspot"],
-        on_change=on_mode_change,
+    mode_hotspot_btn.on_click = lambda e: select_mode("hotspot")
+    mode_wifi_btn.on_click = lambda e: select_mode("wifi")
+
+    mode_row = ft.Container(
+        content=ft.Row([mode_hotspot_btn, mode_wifi_btn], spacing=8),
+        bgcolor="#111827",
+        padding=ft.Padding(top=8, bottom=8, left=8, right=8),
+        border_radius=12,
+        border=make_border("#1f2937"),
     )
 
-    # Step-by-Step Guide Card
-    guide_title = ft.Text("", weight=ft.FontWeight.BOLD, size=14)
-    guide_steps = ft.Column(spacing=6)
-    hotspot_settings_btn = ButtonWidget(
-        "Open Hotspot Settings",
-        icon=ft.Icons.SETTINGS,
+    # â”€â”€ Guide Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    guide_title = ft.Text("", weight=ft.FontWeight.BOLD, size=13, color="#38bdf8")
+    guide_body = ft.Column(spacing=5)
+    hotspot_settings_btn = ft.OutlinedButton(
+        "âš™  Open Hotspot Settings",
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
         on_click=lambda e: open_hotspot_settings(),
+    )
+    guide_container = ft.Container(
+        content=ft.Column([guide_title, guide_body, hotspot_settings_btn], spacing=10),
+        bgcolor="#0f172a",
+        padding=14,
+        border_radius=12,
+        border=make_border("#1e3a5f"),
     )
 
     def open_hotspot_settings():
-        """Launches Android hotspot settings if on Android or displays a helpful prompt."""
-        opened = False
         try:
             subprocess.run(
                 ["am", "start", "-a", "android.settings.TETHER_SETTINGS"],
-                check=False,
-                timeout=1.5,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                check=False, timeout=1.5,
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             )
-            opened = True
         except Exception:
             pass
-
-        if not opened:
-            try:
-                from jnius import autoclass
-                Intent = autoclass("android.content.Intent")
-                Settings = autoclass("android.provider.Settings")
-                activity = autoclass("org.kivy.android.PythonActivity").mActivity
-                intent = Intent(Settings.ACTION_WIRELESS_SETTINGS)
-                activity.startActivity(intent)
-                opened = True
-            except Exception:
-                pass
-
-        notify("Open Settings > Network > Hotspot & tethering on your phone.")
-
-    guide_container = ft.Container(
-        content=ft.Column([
-            ft.Row([ft.Icon(ft.Icons.INFO_OUTLINE, size=18, color=ft.Colors.PRIMARY), guide_title]),
-            guide_steps,
-            hotspot_settings_btn,
-        ], spacing=10),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
-        padding=14,
-        border_radius=12,
-        border=make_border(ft.Colors.OUTLINE_VARIANT),
-    )
+        notify("Open Settings â€º Network â€º Hotspot & tethering")
 
     def update_guide_card():
-        guide_steps.controls.clear()
+        guide_body.controls.clear()
         if active_mode == "hotspot":
-            guide_title.value = "Direct Mobile Hotspot Guide (No Router / No Internet Needed)"
-            guide_steps.controls.extend([
-                ft.Text("1. Turn ON your phone's Personal Hotspot (Mobile Data can stay OFF).", size=13),
-                ft.Text("2. Connect your Laptop, Smart TV, or Tablet to this phone's Hotspot.", size=13),
-                ft.Text("3. Start server below and open URL or scan QR code on the client device.", size=13),
-            ])
+            guide_title.value = "ðŸ“¶  Hotspot Guide (No Router / No Internet)"
+            steps = [
+                "1. Turn ON phone's Personal Hotspot (mobile data can stay OFF).",
+                "2. Connect Laptop / TV / Tablet to this phone's hotspot.",
+                "3. Start server then open the URL or scan QR on the client.",
+            ]
             hotspot_settings_btn.visible = True
         else:
-            guide_title.value = "Wi-Fi Router Guide"
-            guide_steps.controls.extend([
-                ft.Text("1. Ensure your phone and TV/PC are connected to the SAME Wi-Fi router.", size=13),
-                ft.Text("2. Start server below and open URL or scan QR code on the client device.", size=13),
-                ft.Text("3. Works across local LAN without consuming mobile data.", size=13),
-            ])
+            guide_title.value = "ðŸŒ  Wi-Fi Router Guide"
+            steps = [
+                "1. Connect your phone AND the client device to the same Wi-Fi.",
+                "2. Start server then open the URL or scan QR on the client.",
+                "3. No internet needed â€” works over local LAN.",
+            ]
             hotspot_settings_btn.visible = False
+        for s in steps:
+            guide_body.controls.append(ft.Text(s, size=12, color="#cbd5e1"))
 
     update_guide_card()
 
-    # URL Display & QR Code Card
+    # â”€â”€ URL + QR Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    port_input = ft.TextField(
+        label="Port",
+        value="8080",
+        width=100,
+        keyboard_type=ft.KeyboardType.NUMBER,
+        text_size=14,
+        on_change=lambda e: (_lazy_qr_update()),
+    )
+
     url_text = ft.Text(
         f"http://{current_detected_ip}:8080",
-        size=17,
+        size=15,
         weight=ft.FontWeight.BOLD,
-        color=ft.Colors.PRIMARY,
+        color="#38bdf8",
+        selectable=True,
     )
 
     qr_image = ft.Image(
         src=f"data:image/png;base64,{generate_qr_base64(f'http://{current_detected_ip}:8080')}",
-        width=180,
-        height=180,
+        width=160,
+        height=160,
         fit=ft.BoxFit.CONTAIN,
     )
     qr_box = ft.Container(
         content=qr_image,
-        bgcolor=ft.Colors.WHITE,
-        padding=10,
-        border_radius=12,
+        bgcolor="#ffffff",
+        padding=8,
+        border_radius=10,
         alignment=get_alignment_center(),
-        width=200,
-        height=200,
+        width=176,
+        height=176,
     )
+
+    def _lazy_qr_update():
+        update_url_and_qr()
+        page.update()
+
+    def update_url_and_qr():
+        port_val = (port_input.value or "8080").strip()
+        full_url = f"http://{current_detected_ip}:{port_val}"
+        url_text.value = full_url
+        try:
+            new_b64 = generate_qr_base64(full_url)
+            qr_image.src = f"data:image/png;base64,{new_b64}"
+        except Exception:
+            pass
 
     def on_refresh_ip(e):
         nonlocal current_detected_ip
         current_detected_ip = detect_ip(active_mode)
         update_url_and_qr()
         page.update()
-        notify(f"Refreshed IP: {current_detected_ip}")
+        notify(f"IP refreshed â†’ {current_detected_ip}")
 
     def on_copy_url(e):
-        port_val = port_input.value.strip() or "8080"
-        full_url = f"http://{current_detected_ip}:{port_val}"
-        copy_to_clipboard(full_url)
-
-    refresh_btn = ft.IconButton(
-        icon=ft.Icons.REFRESH,
-        tooltip="Refresh Local IP",
-        on_click=on_refresh_ip,
-    )
-    copy_btn = ft.IconButton(
-        icon=ft.Icons.COPY,
-        tooltip="Copy URL to Clipboard",
-        on_click=on_copy_url,
-    )
-
-    def update_url_and_qr():
-        port_val = port_input.value.strip() or "8080"
-        full_url = f"http://{current_detected_ip}:{port_val}"
-        url_text.value = full_url
-        new_b64 = generate_qr_base64(full_url)
-        qr_image.src = f"data:image/png;base64,{new_b64}"
+        port_val = (port_input.value or "8080").strip()
+        copy_to_clipboard(f"http://{current_detected_ip}:{port_val}")
 
     url_card = ft.Container(
         content=ft.Column([
-            ft.Text("Server Streaming Address", size=13, color=ft.Colors.ON_SURFACE_VARIANT),
-            ft.Row([url_text, copy_btn, refresh_btn], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ft.Container(height=6),
+            ft.Text("ðŸ“¡  Streaming Address", size=12, color="#64748b"),
+            ft.Row([
+                url_text,
+                ft.IconButton(ft.Icons.COPY, tooltip="Copy URL", on_click=on_copy_url, icon_color="#38bdf8"),
+                ft.IconButton(ft.Icons.REFRESH, tooltip="Re-detect IP", on_click=on_refresh_ip, icon_color="#38bdf8"),
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
             ft.Row([qr_box], alignment=ft.MainAxisAlignment.CENTER),
             ft.Text(
-                "Scan with phone camera or QR scanner on TV/Laptop to connect",
-                size=12,
-                color=ft.Colors.ON_SURFACE_VARIANT,
-                text_align=ft.TextAlign.CENTER,
+                "Scan QR code from TV / Laptop / VLC to connect",
+                size=11, color="#64748b", text_align=ft.TextAlign.CENTER,
             ),
             ft.Row([
-                ButtonWidget(
-                    "Copy VLC Playlist Link (.m3u)",
-                    icon=ft.Icons.PLAYLIST_PLAY,
+                ft.OutlinedButton(
+                    "ðŸ“‹  Copy VLC Playlist (.m3u)",
+                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
                     on_click=lambda e: copy_to_clipboard(f"{url_text.value}/playlist.m3u"),
                 )
             ], alignment=ft.MainAxisAlignment.CENTER),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
-        padding=16,
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
+        bgcolor="#0f172a",
+        padding=14,
         border_radius=12,
-        border=make_border(ft.Colors.OUTLINE_VARIANT),
+        border=make_border("#1e3a5f"),
     )
 
-    # Configuration Fields: Directory & Port
+    # â”€â”€ Config Card (Directory + Port) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     dir_input = ft.TextField(
-        label="Video Directory Path",
+        label="Video Folder Path",
         value=get_default_media_dir(),
         expand=True,
         prefix_icon=ft.Icons.FOLDER_OPEN,
+        text_size=13,
+        hint_text="/storage/emulated/0/Movies",
     )
 
-    def on_dir_picker_result(e):
+    # FilePicker â€” wrapped in try/except so a missing control never crashes the app
+    _file_picker_ok = False
+    try:
+        file_picker = ft.FilePicker(on_result=lambda e: _on_picker_result(e))
+        page.overlay.append(file_picker)
+        _file_picker_ok = True
+    except Exception:
+        file_picker = None
+
+    def _on_picker_result(e):
         path = getattr(e, "path", None)
         if path:
             dir_input.value = path
             page.update()
 
-    file_picker = ft.FilePicker(on_result=on_dir_picker_result)
-    page.overlay.append(file_picker)
-
     async def on_browse_dir(e):
+        if not _file_picker_ok or file_picker is None:
+            notify("Folder picker not available. Type the path manually.")
+            return
         try:
             if inspect.iscoroutinefunction(file_picker.get_directory_path):
                 picked = await file_picker.get_directory_path(
@@ -1608,92 +1593,79 @@ def build_app(page: ft.Page):
 
     browse_btn = ft.IconButton(
         icon=ft.Icons.FOLDER,
-        tooltip="Select Folder",
+        tooltip="Browse Folder",
+        icon_color="#38bdf8",
         on_click=on_browse_dir,
-    )
-
-    port_input = ft.TextField(
-        label="Server Port",
-        value="8080",
-        width=120,
-        keyboard_type=ft.KeyboardType.NUMBER,
-        on_change=lambda e: (update_url_and_qr(), page.update()),
     )
 
     config_card = ft.Container(
         content=ft.Column([
-            ft.Text("Storage & Network Settings", weight=ft.FontWeight.BOLD, size=14),
-            ft.Row([dir_input, browse_btn], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            ft.Text("âš™  Server Settings", weight=ft.FontWeight.BOLD, size=13, color="#94a3b8"),
+            ft.Row([dir_input, browse_btn], spacing=4),
             ft.Row([
                 port_input,
-                ft.Text("Default is 8080. Accessible across all local devices.", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
-            ], alignment=ft.MainAxisAlignment.START),
+                ft.Text(
+                    "Port to serve on (default 8080).",
+                    size=11, color="#64748b", expand=True,
+                ),
+            ], spacing=8, alignment=ft.MainAxisAlignment.START),
         ], spacing=10),
-        bgcolor=ft.Colors.SURFACE_CONTAINER_HIGH,
+        bgcolor="#0f172a",
         padding=14,
         border_radius=12,
-        border=make_border(ft.Colors.OUTLINE_VARIANT),
+        border=make_border("#1e293b"),
     )
 
-    # Main Start / Stop Button
-    start_stop_btn = ButtonWidget(
-        "Start Server",
-        icon=ft.Icons.PLAY_ARROW,
-        style=ft.ButtonStyle(
-            bgcolor=ft.Colors.PRIMARY,
-            color=ft.Colors.ON_PRIMARY,
-            padding=16,
-            shape=ft.RoundedRectangleBorder(radius=10),
-        ),
+    # â”€â”€ Start / Stop Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    start_stop_btn = ft.FilledButton(
+        "â–¶   Start Server",
+        bgcolor="#1d4ed8",
+        color="#ffffff",
+        width=260,
+        height=48,
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=12)),
     )
 
     def toggle_server(e):
         if not server.is_running:
-            # Start server
             try:
-                port_num = int(port_input.value.strip())
+                port_num = int((port_input.value or "8080").strip())
             except ValueError:
-                notify("Error: Port must be a valid number (e.g. 8080)")
+                notify("Port must be a number (e.g. 8080)")
                 return
-
-            media_path = dir_input.value.strip()
+            media_path = (dir_input.value or "").strip()
             if not media_path:
-                notify("Error: Directory path cannot be empty")
+                notify("Please set a video folder path first")
                 return
 
             server.set_config(media_path, port_num)
             success, msg = server.start()
             if success:
-                status_icon.name = ft.Icons.CHECK_CIRCLE
-                status_icon.color = ft.Colors.GREEN_400
-                status_text.value = f"🟢 Server Running at {url_text.value}"
-                status_text.color = ft.Colors.GREEN_400
-                status_card.border = make_border(ft.Colors.GREEN_800)
+                status_dot.bgcolor = "#22c55e"
+                status_text.value = f"Server Running  â€¢  {url_text.value}"
+                status_text.color = "#22c55e"
+                status_card.bgcolor = "#052e16"
+                status_card.border = make_border("#14532d")
 
-                start_stop_btn.text = "Stop Server"
-                start_stop_btn.icon = ft.Icons.STOP
-                start_stop_btn.style.bgcolor = ft.Colors.RED_700
-                start_stop_btn.style.color = ft.Colors.WHITE
+                start_stop_btn.text = "â¹   Stop Server"
+                start_stop_btn.bgcolor = "#b91c1c"
 
                 dir_input.disabled = True
                 port_input.disabled = True
                 browse_btn.disabled = True
-                notify("Video Server is LIVE! Connect client devices now.")
+                notify("ðŸŸ¢ Server is LIVE â€” connect your client devices now!")
             else:
-                notify(f"Startup Failed: {msg}")
+                notify(f"Failed to start: {msg}")
         else:
-            # Stop server
             server.stop()
-            status_icon.name = ft.Icons.STOP_CIRCLE_OUTLINED
-            status_icon.color = ft.Colors.RED_400
-            status_text.value = "🔴 Server Stopped"
-            status_text.color = ft.Colors.RED_400
-            status_card.border = make_border(ft.Colors.RED_900)
+            status_dot.bgcolor = "#ef4444"
+            status_text.value = "Server Stopped"
+            status_text.color = "#ef4444"
+            status_card.bgcolor = "#1a0a0a"
+            status_card.border = make_border("#7f1d1d")
 
-            start_stop_btn.text = "Start Server"
-            start_stop_btn.icon = ft.Icons.PLAY_ARROW
-            start_stop_btn.style.bgcolor = ft.Colors.PRIMARY
-            start_stop_btn.style.color = ft.Colors.ON_PRIMARY
+            start_stop_btn.text = "â–¶   Start Server"
+            start_stop_btn.bgcolor = "#1d4ed8"
 
             dir_input.disabled = False
             port_input.disabled = False
@@ -1704,44 +1676,40 @@ def build_app(page: ft.Page):
 
     start_stop_btn.on_click = toggle_server
 
-    # Clean header banner with 7Stream logo
-    logo_img_path = Path(__file__).resolve().parent / "assets" / "logo.png"
-    if logo_img_path.exists():
+    # â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
+    if logo_path.exists():
         header_icon = ft.Image(
-            src=str(logo_img_path),
-            width=42,
-            height=42,
-            border_radius=10,
-            fit=ft.BoxFit.CONTAIN,
+            src=str(logo_path), width=40, height=40,
+            border_radius=10, fit=ft.BoxFit.CONTAIN,
         )
     else:
-        header_icon = ft.Icon(ft.Icons.ONDEMAND_VIDEO, size=32, color=ft.Colors.PRIMARY)
+        header_icon = ft.Text("ðŸŽ¬", size=32)
 
-    header_banner = ft.Row([
+    header = ft.Row([
         header_icon,
         ft.Column([
-            ft.Text("7Stream Server", size=20, weight=ft.FontWeight.BOLD),
-            ft.Text("Offline Hotspot & Wi-Fi Media Streaming", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
+            ft.Text("7Stream", size=22, weight=ft.FontWeight.BOLD, color="#f1f5f9"),
+            ft.Text("Hotspot & Wi-Fi Video Server", size=11, color="#475569"),
         ], spacing=2),
     ], spacing=12)
 
-    # Build Page Layout
+    # â”€â”€ Assemble Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     page.add(
         ft.Column([
-            header_banner,
+            header,
             status_card,
-            mode_selector,
+            mode_row,
             guide_container,
             url_card,
             config_card,
             ft.Container(
                 content=start_stop_btn,
                 alignment=get_alignment_center(),
-                padding=make_padding(top=10, bottom=20),
+                padding=make_padding(top=8, bottom=24),
             ),
-        ], spacing=16)
+        ], spacing=14, scroll=ft.ScrollMode.AUTO)
     )
-    page.update()
 
 
 # ============================================================================
@@ -1758,3 +1726,4 @@ if __name__ == "__main__":
         ft.app(target=main)
     else:
         raise RuntimeError("No recognized Flet application runner found.")
+
