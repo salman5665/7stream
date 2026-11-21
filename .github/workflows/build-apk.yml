@@ -50,7 +50,7 @@ jobs:
       - name: Build Android APK with Flet
         run: |
           flet build apk \
-            --project "7stream" \
+            --project "sevenstream" \
             --org "com.sevenstream.app" \
             --product "7Stream" \
             --android-permissions INTERNET=true ACCESS_WIFI_STATE=true CHANGE_WIFI_STATE=true ACCESS_NETWORK_STATE=true READ_EXTERNAL_STORAGE=true MANAGE_EXTERNAL_STORAGE=true WAKE_LOCK=true \

@@ -83,7 +83,7 @@ Build an APK that installs directly onto your phone like any standard Android ap
 Run the following command inside this repository:
 
 ```bash
-flet build apk --project "7stream" --org "com.sevenstream.app" --product "7Stream" --permissions INTERNET,ACCESS_WIFI_STATE,CHANGE_WIFI_STATE,ACCESS_NETWORK_STATE,READ_EXTERNAL_STORAGE,MANAGE_EXTERNAL_STORAGE,WAKE_LOCK
+flet build apk --project "sevenstream" --org "com.sevenstream.app" --product "7Stream" --android-permissions INTERNET=true ACCESS_WIFI_STATE=true CHANGE_WIFI_STATE=true ACCESS_NETWORK_STATE=true READ_EXTERNAL_STORAGE=true MANAGE_EXTERNAL_STORAGE=true WAKE_LOCK=true
 ```
 
 #### 3. Install on Phone
