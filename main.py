@@ -1395,8 +1395,9 @@ def build_app(page: ft.Page):
     # Mode Selector
     def on_mode_change(e):
         nonlocal active_mode, current_detected_ip
-        if mode_selector.selected:
-            active_mode = next(iter(mode_selector.selected))
+        sel = getattr(mode_selector, "selected", None)
+        if sel:
+            active_mode = list(sel)[0] if isinstance(sel, (list, set, tuple)) else str(sel)
         current_detected_ip = detect_ip(active_mode)
         update_guide_card()
         update_url_and_qr()
@@ -1415,7 +1416,7 @@ def build_app(page: ft.Page):
                 icon=ft.Icon(ft.Icons.WIFI),
             ),
         ],
-        selected={"hotspot"},
+        selected=["hotspot"],
         on_change=on_mode_change,
     )
 
