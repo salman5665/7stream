@@ -53,7 +53,8 @@ jobs:
             --project "7stream" \
             --org "com.sevenstream.app" \
             --product "7Stream" \
-            --android-permissions android.permission.INTERNET android.permission.ACCESS_WIFI_STATE android.permission.CHANGE_WIFI_STATE android.permission.ACCESS_NETWORK_STATE android.permission.READ_EXTERNAL_STORAGE android.permission.MANAGE_EXTERNAL_STORAGE android.permission.WAKE_LOCK \
+            --android-permissions INTERNET=true ACCESS_WIFI_STATE=true CHANGE_WIFI_STATE=true ACCESS_NETWORK_STATE=true READ_EXTERNAL_STORAGE=true MANAGE_EXTERNAL_STORAGE=true WAKE_LOCK=true \
+            --skip-flutter-doctor \
             --no-rich-output \
             --yes \
             .
