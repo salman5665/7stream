@@ -396,7 +396,7 @@ def render_html_page(
 
     # Build breadcrumb links
     parts = [p for p in rel_path.strip("/").split("/") if p]
-    breadcrumbs_html = '<a href="/" class="crumb-link">ðŸ  Root</a>'
+    breadcrumbs_html = '<a href="/" class="crumb-link">ðŸ🏠 Root</a>'
     built_path = ""
     for idx, part in enumerate(parts):
         built_path += "/" + quote(part)
@@ -1555,53 +1555,142 @@ def build_app(page: ft.Page):
         hint_text="/storage/emulated/0/Movies",
     )
 
-    # FilePicker â€” wrapped in try/except so a missing control never crashes the app
-    _file_picker_ok = False
-    try:
-        file_picker = ft.FilePicker(on_result=lambda e: _on_picker_result(e))
-        page.overlay.append(file_picker)
-        _file_picker_ok = True
-    except Exception:
-        file_picker = None
+    # Quick folder presets for Android and Desktop
+    def set_folder_preset(preset_path: str):
+        dir_input.value = preset_path
+        page.update()
+        notify(f"Selected: {preset_path}")
 
-    def _on_picker_result(e):
-        path = getattr(e, "path", None)
-        if path:
-            dir_input.value = path
-            page.update()
+    is_android = Path("/storage/emulated/0").exists()
+    movies_preset = "/storage/emulated/0/Movies" if is_android else str(Path.home() / "Videos")
+    download_preset = "/storage/emulated/0/Download" if is_android else str(Path.home() / "Downloads")
+    dcim_preset = "/storage/emulated/0/DCIM" if is_android else str(Path.home() / "Pictures")
+    storage_preset = "/storage/emulated/0" if is_android else str(Path.home())
 
-    async def on_browse_dir(e):
-        if not _file_picker_ok or file_picker is None:
-            notify("Folder picker not available. Type the path manually.")
-            return
-        try:
-            if inspect.iscoroutinefunction(file_picker.get_directory_path):
-                picked = await file_picker.get_directory_path(
-                    dialog_title="Select Video Folder",
-                    initial_directory=dir_input.value or None,
+    preset_chips = ft.Row([
+        ft.TextButton("🎬 Movies", on_click=lambda e: set_folder_preset(movies_preset)),
+        ft.TextButton("📥 Download", on_click=lambda e: set_folder_preset(download_preset)),
+        ft.TextButton("📷 DCIM", on_click=lambda e: set_folder_preset(dcim_preset)),
+        ft.TextButton("📱 Storage", on_click=lambda e: set_folder_preset(storage_preset)),
+    ], wrap=True, spacing=2)
+
+    # In-App Pure-Python Directory Browser (zero native Flutter plugins, 100% Android compatible)
+    folder_dialog = None
+    browse_state = {"path": dir_input.value or get_default_media_dir()}
+    folder_list_view = ft.ListView(expand=True, spacing=2, height=240)
+    current_path_text = ft.Text(size=11, color="#38bdf8", weight=ft.FontWeight.BOLD)
+
+    def refresh_folder_list():
+        c_path = Path(browse_state["path"]).resolve()
+        current_path_text.value = str(c_path)
+        folder_list_view.controls.clear()
+
+        # Up one level
+        if c_path.parent != c_path and str(c_path) not in ("/", "C:\\"):
+            def go_parent(e, p=c_path.parent):
+                browse_state["path"] = str(p)
+                refresh_folder_list()
+                page.update()
+            folder_list_view.controls.append(
+                ft.ListTile(
+                    leading=ft.Icon(ft.Icons.ARROW_UPWARD, color="#38bdf8", size=20),
+                    title=ft.Text(".. (Up one level)", color="#38bdf8", size=13),
+                    on_click=go_parent,
                 )
-                if picked:
-                    dir_input.value = picked
-                    page.update()
-            else:
-                file_picker.get_directory_path(
-                    dialog_title="Select Video Folder",
-                    initial_directory=dir_input.value or None,
+            )
+
+        try:
+            entries = sorted(os.scandir(c_path), key=lambda x: x.name.lower())
+            found_dirs = 0
+            for entry in entries:
+                if entry.is_dir() and not entry.name.startswith("."):
+                    found_dirs += 1
+                    def on_dir_click(e, d=entry.path):
+                        browse_state["path"] = d
+                        refresh_folder_list()
+                        page.update()
+                    folder_list_view.controls.append(
+                        ft.ListTile(
+                            leading=ft.Icon(ft.Icons.FOLDER, color="#facc15", size=20),
+                            title=ft.Text(entry.name, size=13),
+                            on_click=on_dir_click,
+                        )
+                    )
+            if found_dirs == 0:
+                folder_list_view.controls.append(
+                    ft.Text("No subfolders here.", size=12, color="#94a3b8")
                 )
         except Exception as ex:
-            notify(f"Picker error: {ex}")
+            folder_list_view.controls.append(
+                ft.Text(f"Cannot access folder: {ex}", color="#ef4444", size=12)
+            )
+
+    def on_select_current_folder(e):
+        dir_input.value = browse_state["path"]
+        if hasattr(page, "pop_dialog"):
+            try:
+                page.pop_dialog()
+            except Exception:
+                pass
+        if folder_dialog:
+            folder_dialog.open = False
+        page.update()
+        notify(f"Selected: {dir_input.value}")
+
+    def on_cancel_dialog(e):
+        if hasattr(page, "pop_dialog"):
+            try:
+                page.pop_dialog()
+            except Exception:
+                pass
+        if folder_dialog:
+            folder_dialog.open = False
+        page.update()
+
+    def open_browse_dialog(e):
+        nonlocal folder_dialog
+        init_p = dir_input.value.strip() if dir_input.value else get_default_media_dir()
+        if not Path(init_p).exists():
+            init_p = get_default_media_dir()
+        browse_state["path"] = init_p
+        refresh_folder_list()
+
+        folder_dialog = ft.AlertDialog(
+            title=ft.Text("Select Video Folder", size=16, weight=ft.FontWeight.BOLD),
+            content=ft.Container(
+                content=ft.Column([
+                    current_path_text,
+                    ft.Divider(color="#334155", height=1),
+                    folder_list_view,
+                ], spacing=6),
+                width=340,
+                height=300,
+            ),
+            actions=[
+                ft.TextButton("Cancel", on_click=on_cancel_dialog),
+                ft.FilledButton("Select This Folder", on_click=on_select_current_folder),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        if hasattr(page, "show_dialog"):
+            page.show_dialog(folder_dialog)
+        else:
+            page.dialog = folder_dialog
+            folder_dialog.open = True
+            page.update()
 
     browse_btn = ft.IconButton(
-        icon=ft.Icons.FOLDER,
-        tooltip="Browse Folder",
+        icon=ft.Icons.FOLDER_OPEN,
+        tooltip="Browse Folders",
         icon_color="#38bdf8",
-        on_click=on_browse_dir,
+        on_click=open_browse_dialog,
     )
 
     config_card = ft.Container(
         content=ft.Column([
-            ft.Text("âš™  Server Settings", weight=ft.FontWeight.BOLD, size=13, color="#94a3b8"),
+            ft.Text("Server Settings", weight=ft.FontWeight.BOLD, size=13, color="#94a3b8"),
             ft.Row([dir_input, browse_btn], spacing=4),
+            preset_chips,
             ft.Row([
                 port_input,
                 ft.Text(
