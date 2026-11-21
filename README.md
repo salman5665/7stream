@@ -199,26 +199,4 @@ VLC Media Player supports native HTTP byte-range seeking and automatic playlist 
 
 ---
 
-## Pushing to GitHub
 
-To push this repository to your personal GitHub account:
-
-```bash
-# 1. Initialize git
-git init
-
-# 2. Add all files
-git add .
-
-# 3. Create initial commit
-git commit -m "Initial commit: 7Stream standalone Android video streaming server"
-
-# 4. Set default branch to main
-git branch -M main
-
-# 5. Add your GitHub remote repository (replace with your repo URL)
-git remote add origin https://github.com/<your-username>/7stream.git
-
-# 6. Push to GitHub
-git push -u origin main
-```
