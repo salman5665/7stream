@@ -25,6 +25,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Accept Android Licenses
+        run: |
+          yes | flutter doctor --android-licenses || true
+          flutter doctor -v
+
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
@@ -37,17 +48,15 @@ jobs:
           pip install -r requirements.txt
 
       - name: Build Android APK with Flet
-        env:
-          ANDROID_HOME: /usr/local/lib/android/sdk
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           flet build apk \
             --project "7stream" \
             --org "com.sevenstream.app" \
             --product "7Stream" \
-            --android-permissions INTERNET ACCESS_WIFI_STATE CHANGE_WIFI_STATE ACCESS_NETWORK_STATE READ_EXTERNAL_STORAGE MANAGE_EXTERNAL_STORAGE WAKE_LOCK \
+            --android-permissions android.permission.INTERNET android.permission.ACCESS_WIFI_STATE android.permission.CHANGE_WIFI_STATE android.permission.ACCESS_NETWORK_STATE android.permission.READ_EXTERNAL_STORAGE android.permission.MANAGE_EXTERNAL_STORAGE android.permission.WAKE_LOCK \
             --no-rich-output \
-            --yes
+            --yes \
+            .
 
       - name: Locate Generated APK
         id: find_apk
