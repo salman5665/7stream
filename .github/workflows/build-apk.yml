@@ -1,0 +1,86 @@
+name: Build 7Stream Android APK
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build Android APK with Flet
+        run: |
+          flet build apk \
+            --project "7stream" \
+            --org "com.sevenstream.app" \
+            --product "7Stream" \
+            --android-permissions INTERNET ACCESS_WIFI_STATE CHANGE_WIFI_STATE ACCESS_NETWORK_STATE READ_EXTERNAL_STORAGE MANAGE_EXTERNAL_STORAGE WAKE_LOCK \
+            --no-rich-output \
+            --yes
+
+      - name: Locate Generated APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find build/apk -type f -name "*.apk" | head -n 1)
+          echo "Found APK at: $APK_PATH"
+          echo "apk_path=$APK_PATH" >> $GITHUB_OUTPUT
+          cp "$APK_PATH" 7Stream.apk
+
+      - name: Upload APK as Workflow Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: 7Stream-Android-APK
+          path: 7Stream.apk
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: "7Stream Android Release v1.0.0"
+          body: |
+            ### 7Stream Android Video Streaming Server v1.0.0
+            
+            - **Direct Mobile Hotspot Streaming (100% Offline)**
+            - **Wi-Fi Router LAN Streaming**
+            - **Native HTTP 206 Byte-Range Video Seeking**
+            - **Auto-generated VLC Playlist (.m3u)**
+            - **Embedded Responsive Dark-Mode Web Browser**
+            
+            #### Download:
+            Download **`7Stream.apk`** below directly onto your Android device and tap to install!
+          files: 7Stream.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
