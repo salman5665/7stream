@@ -36,19 +36,11 @@ SIOCGIFADDR = 0x8915
 
 # Supported video extensions for streaming and playlist generation
 VIDEO_EXTENSIONS = {
-    ".mp4",
-    ".mkv",
-    ".avi",
-    ".mov",
-    ".webm",
-    ".ts",
-    ".flv",
-    ".m4v",
-    ".3gp",
-    ".wmv",
-    ".m2ts",
-    ".vob",
-    ".ogv",
+    ".mp4", ".mkv", ".avi", ".mov", ".webm", ".ts", ".flv", ".m4v",
+    ".3gp", ".wmv", ".m2ts", ".vob", ".ogv", ".mpg", ".mpeg", ".m4p",
+    ".mp2", ".mpe", ".mpv", ".m2v", ".divx", ".xvid", ".asf", ".rm",
+    ".rmvb", ".m3u8", ".mp3", ".m4a", ".aac", ".flac", ".wav", ".ogg",
+    ".opus",
 }
 
 # Ensure comprehensive MIME mappings for mobile and desktop media
@@ -63,8 +55,17 @@ EXTRA_MIME_TYPES = {
     ".m4v": "video/x-m4v",
     ".3gp": "video/3gpp",
     ".wmv": "video/x-ms-wmv",
+    ".mpg": "video/mpeg",
+    ".mpeg": "video/mpeg",
     ".m3u": "audio/x-mpegurl",
     ".m3u8": "application/vnd.apple.mpegurl",
+    ".mp3": "audio/mpeg",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".flac": "audio/flac",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".opus": "audio/opus",
 }
 for ext, mime in EXTRA_MIME_TYPES.items():
     mimetypes.add_type(mime, ext)
@@ -358,146 +359,267 @@ def format_size(bytes_num: int) -> str:
         return f"{bytes_num / (1024 * 1024 * 1024):.2f} GB"
 
 
+def count_videos_in_dir(d_path: Path) -> int:
+    """Quickly counts video files directly in or inside d_path."""
+    count = 0
+    try:
+        for root, dirs, files in os.walk(d_path):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for f in files:
+                if Path(f).suffix.lower() in VIDEO_EXTENSIONS:
+                    count += 1
+    except Exception:
+        pass
+    return count
+
+
 def render_html_page(
-    base_dir: Path, current_path: Path, rel_path: str, host_header: str
+    base_dir: Path, current_path: Path, rel_path: str, host_header: str, view_mode: str = "folders"
 ) -> str:
     """
-    Renders a responsive, modern dark-mode directory browser
-    with video preview modal, search filtering, and VLC playlist shortcuts.
-    Self-contained with zero external CDNs so it operates offline.
+    Renders a responsive, modern dark-mode media browser.
+    Supports both Folder-by-Folder Navigation and All-Videos Recursive View.
+    Zero external CDNs so it operates 100% offline.
     """
-    items = []
-    try:
-        entries = sorted(
-            os.scandir(current_path),
-            key=lambda e: (not e.is_dir(), e.name.lower()),
-        )
-    except Exception as err:
-        entries = []
+    total_library_videos = count_videos_in_dir(base_dir)
 
-    subdirs = []
-    video_files = []
-    other_files = []
-
-    for entry in entries:
+    if view_mode == "all":
+        # Recursive view of ALL video files in the library
+        all_videos_list = []
         try:
-            if entry.name.startswith("."):
-                continue
-            if entry.is_dir():
-                subdirs.append(entry)
-            elif entry.is_file():
-                ext = Path(entry.name).suffix.lower()
-                if ext in VIDEO_EXTENSIONS:
-                    video_files.append(entry)
-                else:
-                    other_files.append(entry)
+            for root, dirs, files in os.walk(base_dir):
+                dirs[:] = [d for d in dirs if not d.startswith(".")]
+                for fname in sorted(files):
+                    if fname.startswith("."):
+                        continue
+                    ext = Path(fname).suffix.lower()
+                    if ext in VIDEO_EXTENSIONS:
+                        full_fpath = Path(root) / fname
+                        try:
+                            rel = full_fpath.relative_to(base_dir)
+                            url_rel = str(rel).replace(chr(92), "/")
+                            all_videos_list.append((full_fpath, fname, url_rel, ext))
+                        except Exception:
+                            continue
         except Exception:
-            continue
+            all_videos_list = []
 
-    # Build breadcrumb links
-    parts = [p for p in rel_path.strip("/").split("/") if p]
-    breadcrumbs_html = '<a href="/" class="crumb-link">ðŸ🏠 Root</a>'
-    built_path = ""
-    for idx, part in enumerate(parts):
-        built_path += "/" + quote(part)
-        safe_part = html.escape(part)
-        if idx == len(parts) - 1:
-            breadcrumbs_html += f' <span class="sep">/</span> <span class="crumb-current">{safe_part}</span>'
-        else:
-            breadcrumbs_html += f' <span class="sep">/</span> <a href="/browse{built_path}" class="crumb-link">{safe_part}</a>'
+        videos_html = []
+        for full_p, fname, url_rel, ext in all_videos_list:
+            try:
+                stat = full_p.stat()
+                size_str = format_size(stat.st_size)
+                mtime_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime))
+            except Exception:
+                size_str = "Unknown"
+                mtime_str = ""
 
-    # Parent directory link
-    parent_link_html = ""
-    if parts:
-        parent_rel = "/".join(parts[:-1])
-        if parent_rel:
-            parent_url = f"/browse/{quote(parent_rel)}"
-        else:
-            parent_url = "/"
-        parent_link_html = f"""
-        <a href="{parent_url}" class="card card-parent">
-            <div class="card-icon">ðŸ“â¬†ï¸</div>
-            <div class="card-info">
-                <div class="card-title">.. (Parent Directory)</div>
-                <div class="card-meta">Go up one level</div>
-            </div>
-        </a>
-        """
+            stream_url = f"/video/{quote(url_rel)}"
+            full_stream_url = f"http://{host_header}{stream_url}"
+            safe_name = html.escape(fname)
+            parent_rel = str(Path(url_rel).parent).replace(chr(92), "/")
+            folder_tag = f"📁 {parent_rel}" if parent_rel and parent_rel != "." else "📁 Root"
 
-    # Subdirectories
-    folders_html = []
-    for d in subdirs:
-        sub_rel = (
-            f"{rel_path.strip('/')}/{d.name}".strip("/") if rel_path else d.name
-        )
-        folder_url = f"/browse/{quote(sub_rel)}"
-        safe_name = html.escape(d.name)
-        folders_html.append(f"""
-        <a href="{folder_url}" class="card card-folder" data-name="{safe_name.lower()}">
-            <div class="card-icon">ðŸ“</div>
-            <div class="card-info">
-                <div class="card-title">{safe_name}</div>
-                <div class="card-meta">Folder</div>
-            </div>
-            <div class="card-arrow">âž”</div>
-        </a>
-        """)
-
-    # Video files
-    videos_html = []
-    for f in video_files:
-        try:
-            stat = f.stat()
-            size_str = format_size(stat.st_size)
-            mtime_str = time.strftime(
-                "%Y-%m-%d %H:%M", time.localtime(stat.st_mtime)
-            )
-        except Exception:
-            size_str = "Unknown"
-            mtime_str = ""
-
-        f_rel = (
-            f"{rel_path.strip('/')}/{f.name}".strip("/") if rel_path else f.name
-        )
-        stream_url = f"/video/{quote(f_rel)}"
-        full_stream_url = f"http://{host_header}{stream_url}"
-        safe_name = html.escape(f.name)
-        ext = Path(f.name).suffix.lower()
-
-        videos_html.append(f"""
-        <div class="card card-video" data-name="{safe_name.lower()}">
-            <div class="card-icon">ðŸŽ¬</div>
-            <div class="card-info">
-                <div class="card-title" title="{safe_name}">{safe_name}</div>
-                <div class="card-meta">
-                    <span class="badge badge-ext">{ext.upper().replace('.', '')}</span>
-                    <span class="badge badge-size">{size_str}</span>
-                    <span class="meta-date">{mtime_str}</span>
+            videos_html.append(f"""
+            <div class="card card-video" data-name="{safe_name.lower()}">
+                <div class="card-icon">🎬</div>
+                <div class="card-info">
+                    <div class="card-title" title="{safe_name}">{safe_name}</div>
+                    <div class="card-meta">
+                        <span class="badge badge-ext">{ext.upper().replace('.', '')}</span>
+                        <span class="badge badge-size">{size_str}</span>
+                        <span class="badge badge-folder" title="Location">{folder_tag}</span>
+                        <span class="meta-date">{mtime_str}</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
+                        ▶ Play
+                    </button>
+                    <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
+                        ⬇
+                    </a>
+                    <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
+                        🔗 Copy
+                    </button>
                 </div>
             </div>
-            <div class="card-actions">
-                <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
-                    â–¶ Play
-                </button>
-                <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
-                    â¬‡
-                </a>
-                <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
-                    ðŸ”— Copy
-                </button>
-            </div>
-        </div>
-        """)
+            """)
 
-    folder_content = "\n".join(folders_html) if folders_html else ""
-    video_content = (
-        "\n".join(videos_html)
-        if videos_html
-        else '<div class="empty-state">No video files found in this directory.</div>'
-    )
+        main_items_html = "\n".join(videos_html) if videos_html else (
+            '<div class="empty-state">No video files found anywhere in this library.<br><br>'
+            '💡 If you have videos in your phone, ensure "All files access" is granted in 7Stream app settings.</div>'
+        )
+        breadcrumbs_html = '<span class="crumb-current">🎥 All Videos (Entire Library)</span>'
+        stats_text = f"{len(all_videos_list)} Video(s) across all folders"
+
+    else:
+        # Standard folder-by-folder view
+        try:
+            entries = sorted(
+                os.scandir(current_path),
+                key=lambda e: (not e.is_dir(), e.name.lower()),
+            )
+        except Exception:
+            entries = []
+
+        subdirs = []
+        video_files = []
+        other_files = []
+
+        for entry in entries:
+            try:
+                if entry.name.startswith("."):
+                    continue
+                if entry.is_dir():
+                    subdirs.append(entry)
+                elif entry.is_file():
+                    ext = Path(entry.name).suffix.lower()
+                    if ext in VIDEO_EXTENSIONS:
+                        video_files.append(entry)
+                    else:
+                        other_files.append(entry)
+            except Exception:
+                continue
+
+        # Breadcrumbs
+        parts = [p for p in rel_path.strip("/").split("/") if p]
+        breadcrumbs_html = '<a href="/?view=folders" class="crumb-link">🏠 Root</a>'
+        built_path = ""
+        for idx, part in enumerate(parts):
+            built_path += "/" + quote(part)
+            safe_part = html.escape(part)
+            if idx == len(parts) - 1:
+                breadcrumbs_html += f' <span class="sep">/</span> <span class="crumb-current">{safe_part}</span>'
+            else:
+                breadcrumbs_html += f' <span class="sep">/</span> <a href="/browse{built_path}?view=folders" class="crumb-link">{safe_part}</a>'
+
+        # Parent directory link
+        parent_link_html = ""
+        if parts:
+            parent_rel = "/".join(parts[:-1])
+            parent_url = f"/browse/{quote(parent_rel)}?view=folders" if parent_rel else "/?view=folders"
+            parent_link_html = f"""
+            <a href="{parent_url}" class="card card-parent">
+                <div class="card-icon">📁⬆️</div>
+                <div class="card-info">
+                    <div class="card-title">.. (Parent Directory)</div>
+                    <div class="card-meta">Go up one level</div>
+                </div>
+            </a>
+            """
+
+        # Subdirectories with recursive video counts
+        folders_html = []
+        for d in subdirs:
+            sub_rel = f"{rel_path.strip('/')}/{d.name}".strip("/") if rel_path else d.name
+            folder_url = f"/browse/{quote(sub_rel)}?view=folders"
+            safe_name = html.escape(d.name)
+            try:
+                vids_in_sub = count_videos_in_dir(Path(d.path))
+                vids_meta = f"📁 Folder • {vids_in_sub} video(s) inside" if vids_in_sub > 0 else "📁 Folder"
+            except Exception:
+                vids_meta = "📁 Folder"
+
+            folders_html.append(f"""
+            <a href="{folder_url}" class="card card-folder" data-name="{safe_name.lower()}">
+                <div class="card-icon">📁</div>
+                <div class="card-info">
+                    <div class="card-title">{safe_name}</div>
+                    <div class="card-meta">{vids_meta}</div>
+                </div>
+                <div class="card-arrow">➔</div>
+            </a>
+            """)
+
+        # Direct video files
+        videos_html = []
+        for f in video_files:
+            try:
+                stat = f.stat()
+                size_str = format_size(stat.st_size)
+                mtime_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(stat.st_mtime))
+            except Exception:
+                size_str = "Unknown"
+                mtime_str = ""
+
+            f_rel = f"{rel_path.strip('/')}/{f.name}".strip("/") if rel_path else f.name
+            stream_url = f"/video/{quote(f_rel)}"
+            full_stream_url = f"http://{host_header}{stream_url}"
+            safe_name = html.escape(f.name)
+            ext = Path(f.name).suffix.lower()
+
+            videos_html.append(f"""
+            <div class="card card-video" data-name="{safe_name.lower()}">
+                <div class="card-icon">🎬</div>
+                <div class="card-info">
+                    <div class="card-title" title="{safe_name}">{safe_name}</div>
+                    <div class="card-meta">
+                        <span class="badge badge-ext">{ext.upper().replace('.', '')}</span>
+                        <span class="badge badge-size">{size_str}</span>
+                        <span class="meta-date">{mtime_str}</span>
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
+                        ▶ Play
+                    </button>
+                    <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
+                        ⬇
+                    </a>
+                    <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
+                        🔗 Copy
+                    </button>
+                </div>
+            </div>
+            """)
+
+        # Other media or files
+        other_html = []
+        for f in other_files:
+            try:
+                size_str = format_size(f.stat().st_size)
+            except Exception:
+                size_str = ""
+            f_rel = f"{rel_path.strip('/')}/{f.name}".strip("/") if rel_path else f.name
+            file_url = f"/video/{quote(f_rel)}"
+            safe_name = html.escape(f.name)
+            ext = Path(f.name).suffix.lower()
+            other_html.append(f"""
+            <div class="card card-other" data-name="{safe_name.lower()}">
+                <div class="card-icon">📄</div>
+                <div class="card-info">
+                    <div class="card-title">{safe_name}</div>
+                    <div class="card-meta">{ext.upper().replace('.', '')} • {size_str}</div>
+                </div>
+                <div class="card-actions">
+                    <a href="{file_url}" download="{safe_name}" class="btn btn-download">⬇ Download</a>
+                </div>
+            </div>
+            """)
+
+        folder_block = "\n".join(folders_html)
+        video_block = "\n".join(videos_html)
+        other_block = "\n".join(other_html)
+
+        empty_message = ""
+        if not video_files and subdirs:
+            empty_message = (
+                f'<div class="info-note">📁 This directory has {len(subdirs)} subfolder(s). '
+                f'Click any folder above, or switch to <a href="/?view=all" style="color:var(--primary);font-weight:bold;">All Videos View</a> '
+                f'to see all {total_library_videos} video(s) at once.</div>'
+            )
+        elif not video_files and not subdirs:
+            empty_message = '<div class="empty-state">No video files or folders found here.</div>'
+
+        main_items_html = f"{parent_link_html}\n{folder_block}\n{video_block}\n{other_block}\n{empty_message}"
+        stats_text = f"{len(video_files)} Video(s), {len(subdirs)} Folder(s)"
 
     playlist_param = f"?path={quote(rel_path)}" if rel_path else ""
     vlc_playlist_url = f"/playlist.m3u{playlist_param}"
+
+    active_folders_class = "active" if view_mode != "all" else ""
+    active_all_class = "active" if view_mode == "all" else ""
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -523,7 +645,7 @@ def render_html_page(
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }}
         body {{
             background-color: var(--bg);
@@ -535,7 +657,7 @@ def render_html_page(
         header {{
             background: linear-gradient(180deg, #162033 0%, var(--surface) 100%);
             border-bottom: 1px solid var(--border);
-            padding: 16px 20px;
+            padding: 14px 20px;
             position: sticky;
             top: 0;
             z-index: 50;
@@ -556,22 +678,41 @@ def render_html_page(
             gap: 12px;
         }}
         .logo-icon {{
-            font-size: 28px;
+            font-size: 26px;
             background: rgba(56, 189, 248, 0.15);
-            padding: 8px;
-            border-radius: 12px;
+            padding: 6px;
+            border-radius: 10px;
             border: 1px solid rgba(56, 189, 248, 0.3);
         }}
         .logo-title {{
-            font-size: 1.25rem;
+            font-size: 1.2rem;
             font-weight: 700;
-            letter-spacing: -0.02em;
             color: #ffffff;
         }}
-        .logo-subtitle {{
-            font-size: 0.8rem;
-            color: var(--primary);
-            font-weight: 500;
+        .view-switcher {{
+            display: flex;
+            gap: 6px;
+            background: rgba(0,0,0,0.3);
+            padding: 4px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }}
+        .tab-btn {{
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--text-muted);
+            transition: all 0.2s;
+        }}
+        .tab-btn.active {{
+            background: var(--primary);
+            color: #0c4a6e;
+        }}
+        .tab-btn:hover:not(.active) {{
+            color: #ffffff;
+            background: rgba(255,255,255,0.08);
         }}
         .header-actions {{
             display: flex;
@@ -588,12 +729,7 @@ def render_html_page(
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            font-size: 0.88rem;
-            transition: all 0.2s ease;
-        }}
-        .btn-header:hover {{
-            background: #34d399;
-            transform: translateY(-1px);
+            font-size: 0.85rem;
         }}
         main {{
             max-width: 1100px;
@@ -607,8 +743,8 @@ def render_html_page(
             border: 1px solid var(--border);
             padding: 10px 16px;
             border-radius: 10px;
-            margin-bottom: 20px;
-            font-size: 0.92rem;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -619,9 +755,6 @@ def render_html_page(
             color: var(--primary);
             text-decoration: none;
             font-weight: 500;
-        }}
-        .crumb-link:hover {{
-            text-decoration: underline;
         }}
         .crumb-current {{
             color: var(--text);
@@ -652,7 +785,6 @@ def render_html_page(
             border-radius: 8px;
             font-size: 0.9rem;
             outline: none;
-            transition: border 0.2s;
         }}
         .search-input:focus {{
             border-color: var(--primary);
@@ -696,7 +828,7 @@ def render_html_page(
             transform: translateY(-1px);
         }}
         .card-icon {{
-            font-size: 26px;
+            font-size: 24px;
             flex-shrink: 0;
         }}
         .card-info {{
@@ -704,7 +836,7 @@ def render_html_page(
             min-width: 0;
         }}
         .card-title {{
-            font-size: 1rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: #ffffff;
             white-space: nowrap;
@@ -736,6 +868,12 @@ def render_html_page(
             background: rgba(255, 255, 255, 0.08);
             color: #e2e8f0;
         }}
+        .badge-folder {{
+            background: rgba(168, 85, 247, 0.15);
+            color: #d8b4fe;
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            text-transform: none;
+        }}
         .card-arrow {{
             color: var(--text-muted);
             font-size: 1.1rem;
@@ -754,7 +892,6 @@ def render_html_page(
             cursor: pointer;
             border: none;
             text-decoration: none;
-            transition: all 0.2s ease;
             display: inline-flex;
             align-items: center;
             gap: 4px;
@@ -763,24 +900,24 @@ def render_html_page(
             background: var(--primary);
             color: #0c4a6e;
         }}
-        .btn-play:hover {{
-            background: var(--primary-hover);
-        }}
         .btn-download {{
             background: var(--surface-hover);
             color: var(--text);
             border: 1px solid var(--border);
-        }}
-        .btn-download:hover {{
-            background: #28374f;
         }}
         .btn-copy {{
             background: rgba(168, 85, 247, 0.15);
             color: #d8b4fe;
             border: 1px solid rgba(168, 85, 247, 0.3);
         }}
-        .btn-copy:hover {{
-            background: rgba(168, 85, 247, 0.3);
+        .info-note {{
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            padding: 16px;
+            border-radius: 12px;
+            color: #cbd5e1;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }}
         .empty-state {{
             text-align: center;
@@ -790,10 +927,11 @@ def render_html_page(
             border: 1px dashed var(--border);
             border-radius: 12px;
             font-size: 0.95rem;
+            line-height: 1.6;
         }}
         footer {{
             border-top: 1px solid var(--border);
-            padding: 16px 20px;
+            padding: 14px 20px;
             text-align: center;
             font-size: 0.8rem;
             color: var(--text-muted);
@@ -812,7 +950,6 @@ def render_html_page(
             align-items: center;
             justify-content: center;
             padding: 20px;
-            backdrop-filter: blur(8px);
         }}
         .modal-content {{
             background: var(--surface);
@@ -837,7 +974,6 @@ def render_html_page(
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            padding-right: 12px;
         }}
         .modal-close {{
             background: none;
@@ -846,17 +982,11 @@ def render_html_page(
             font-size: 24px;
             cursor: pointer;
             padding: 4px 8px;
-            line-height: 1;
-            border-radius: 6px;
-        }}
-        .modal-close:hover {{
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.1);
         }}
         .video-wrapper {{
             background: #000000;
             position: relative;
-            padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            padding-top: 56.25%;
         }}
         .video-wrapper video {{
             position: absolute;
@@ -864,7 +994,6 @@ def render_html_page(
             left: 0;
             width: 100%;
             height: 100%;
-            outline: none;
         }}
         .modal-footer {{
             padding: 12px 18px;
@@ -875,7 +1004,6 @@ def render_html_page(
             color: var(--text-muted);
             background: #111827;
         }}
-        /* Toast notification */
         .toast {{
             position: fixed;
             bottom: 24px;
@@ -885,30 +1013,14 @@ def render_html_page(
             font-weight: 600;
             padding: 10px 18px;
             border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.4);
-            transform: translateY(100px);
             opacity: 0;
+            transform: translateY(100px);
             transition: all 0.3s ease;
             z-index: 200;
-            pointer-events: none;
         }}
         .toast.show {{
             transform: translateY(0);
             opacity: 1;
-        }}
-        @media (max-width: 600px) {{
-            .card {{
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 10px;
-            }}
-            .card-actions {{
-                width: 100%;
-                justify-content: flex-end;
-            }}
-            .logo-subtitle {{
-                display: none;
-            }}
         }}
     </style>
 </head>
@@ -916,15 +1028,20 @@ def render_html_page(
     <header>
         <div class="header-wrap">
             <div class="logo-group">
-                <div class="logo-icon">ðŸŽ¬</div>
+                <div class="logo-icon">🎬</div>
                 <div>
-                    <div class="logo-title">7Stream Media Server</div>
-                    <div class="logo-subtitle">Hardware-Accelerated Video Streaming</div>
+                    <div class="logo-title">7Stream Server</div>
                 </div>
             </div>
+
+            <div class="view-switcher">
+                <a href="/?view=folders" class="tab-btn {active_folders_class}">📁 Folders</a>
+                <a href="/?view=all" class="tab-btn {active_all_class}">🎥 All Videos ({total_library_videos})</a>
+            </div>
+
             <div class="header-actions">
                 <a href="{vlc_playlist_url}" class="btn-header" title="Download recursive .m3u playlist for VLC">
-                    ðŸ“‹ Open VLC Playlist (.m3u)
+                    📋 Open in VLC (.m3u)
                 </a>
             </div>
         </div>
@@ -937,18 +1054,16 @@ def render_html_page(
 
         <div class="toolbar">
             <div class="search-box">
-                <span class="search-icon">ðŸ”</span>
+                <span class="search-icon">🔍</span>
                 <input type="text" id="filterInput" class="search-input" placeholder="Search videos or folders..." oninput="filterList()">
             </div>
             <div class="stats-badge" id="statsBadge">
-                {len(video_files)} Video(s), {len(subdirs)} Folder(s)
+                {stats_text}
             </div>
         </div>
 
         <div class="grid" id="itemsList">
-            {parent_link_html}
-            {folder_content}
-            {video_content}
+            {main_items_html}
         </div>
     </main>
 
@@ -970,12 +1085,11 @@ def render_html_page(
             </div>
             <div class="modal-footer">
                 <span>Seeking supported via HTTP 206 Partial Content</span>
-                <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">ðŸ”— Copy Stream Link</button>
+                <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">🔗 Copy Stream Link</button>
             </div>
         </div>
     </div>
 
-    <!-- Notification Toast -->
     <div id="toast" class="toast">Link copied to clipboard!</div>
 
     <script>
@@ -1016,7 +1130,6 @@ def render_html_page(
             navigator.clipboard.writeText(text).then(() => {{
                 showToast("Stream URL copied to clipboard!");
             }}).catch(() => {{
-                // Fallback for non-secure contexts
                 const el = document.createElement('textarea');
                 el.value = text;
                 document.body.appendChild(el);
@@ -1045,12 +1158,10 @@ def render_html_page(
         function filterList() {{
             const query = document.getElementById("filterInput").value.toLowerCase().trim();
             const cards = document.querySelectorAll(".card[data-name]");
-            let visibleCount = 0;
             cards.forEach(card => {{
                 const name = card.getAttribute("data-name") || "";
                 if (name.includes(query)) {{
                     card.style.display = "flex";
-                    visibleCount++;
                 }} else {{
                     card.style.display = "none";
                 }}
@@ -1099,6 +1210,18 @@ class VideoServerManager:
             raise web.HTTPForbidden(text="Access denied: Path traversal detected")
         return target
 
+    async def handle_all_videos(self, request: web.Request) -> web.Response:
+        """Serves recursive flat listing of all video files."""
+        host_header = request.host
+        html_content = render_html_page(
+            self.media_root, self.media_root, "", host_header, view_mode="all"
+        )
+        return web.Response(
+            text=html_content,
+            content_type="text/html",
+            headers={"Access-Control-Allow-Origin": "*"},
+        )
+
     async def handle_index(self, request: web.Request) -> web.Response:
         """Root endpoint: serves root directory listing."""
         return await self._serve_directory_or_file(request, "")
@@ -1144,8 +1267,9 @@ class VideoServerManager:
 
         # Target is a directory: generate HTML view
         host_header = request.host
+        view_mode = request.query.get("view", "folders")
         html_content = render_html_page(
-            self.media_root, target, rel_path, host_header
+            self.media_root, target, rel_path, host_header, view_mode=view_mode
         )
         return web.Response(
             text=html_content,
@@ -1178,7 +1302,7 @@ class VideoServerManager:
                         full_fpath = Path(root) / fname
                         try:
                             rel = full_fpath.relative_to(self.media_root)
-                            url_rel = str(rel).replace("\\", "/")
+                            url_rel = str(rel).replace(chr(92), "/")
                             stream_url = f"http://{host_header}/video/{quote(url_rel)}"
                             m3u_lines.append(f"#EXTINF:-1,{fname}")
                             m3u_lines.append(stream_url)
@@ -1226,6 +1350,7 @@ class VideoServerManager:
 
             app = web.Application()
             app.router.add_get("/", self.handle_index)
+            app.router.add_get("/all", self.handle_all_videos)
             app.router.add_get("/browse", self.handle_index)
             app.router.add_get(r"/browse/{tail:.*}", self.handle_browse)
             app.router.add_get(r"/video/{tail:.*}", self.handle_video)
@@ -1439,7 +1564,7 @@ def build_app(page: ft.Page):
     def update_guide_card():
         guide_body.controls.clear()
         if active_mode == "hotspot":
-            guide_title.value = "ðŸ“¶  Hotspot Guide (No Router / No Internet)"
+            guide_title.value = "📶  Hotspot Guide (No Router / No Internet)"
             steps = [
                 "1. Turn ON phone's Personal Hotspot (mobile data can stay OFF).",
                 "2. Connect Laptop / TV / Tablet to this phone's hotspot.",
@@ -1520,7 +1645,7 @@ def build_app(page: ft.Page):
 
     url_card = ft.Container(
         content=ft.Column([
-            ft.Text("ðŸ“¡  Streaming Address", size=12, color="#64748b"),
+            ft.Text("📡  Streaming Address", size=12, color="#64748b"),
             ft.Row([
                 url_text,
                 ft.IconButton(ft.Icons.COPY, tooltip="Copy URL", on_click=on_copy_url, icon_color="#38bdf8"),
@@ -1533,7 +1658,7 @@ def build_app(page: ft.Page):
             ),
             ft.Row([
                 ft.OutlinedButton(
-                    "ðŸ“‹  Copy VLC Playlist (.m3u)",
+                    "📋  Copy VLC Playlist (.m3u)",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
                     on_click=lambda e: copy_to_clipboard(f"{url_text.value}/playlist.m3u"),
                 )
@@ -1555,9 +1680,73 @@ def build_app(page: ft.Page):
         hint_text="/storage/emulated/0/Movies",
     )
 
+    # Live folder video stats & storage permission helper
+    folder_stats_text = ft.Text("Scanning folder...", size=12, color="#94a3b8")
+
+    def update_folder_stats():
+        p_str = (dir_input.value or "").strip()
+        if not p_str:
+            folder_stats_text.value = "⚠️ Please select or type a folder path"
+            folder_stats_text.color = "#ef4444"
+            return
+
+        p = Path(p_str)
+        if not p.exists():
+            folder_stats_text.value = f"⚠️ Folder does not exist: {p_str}"
+            folder_stats_text.color = "#ef4444"
+            return
+        if not p.is_dir():
+            folder_stats_text.value = f"⚠️ Path is a file, not a directory: {p_str}"
+            folder_stats_text.color = "#ef4444"
+            return
+
+        try:
+            direct_vids = 0
+            sub_dirs = 0
+            for e in os.scandir(p):
+                if e.name.startswith("."):
+                    continue
+                if e.is_dir():
+                    sub_dirs += 1
+                elif e.is_file() and Path(e.name).suffix.lower() in VIDEO_EXTENSIONS:
+                    direct_vids += 1
+
+            total_vids = count_videos_in_dir(p)
+            if direct_vids > 0:
+                folder_stats_text.value = f"🎬 {direct_vids} direct video(s) • {total_vids} total across subfolders"
+                folder_stats_text.color = "#22c55e"
+            elif total_vids > 0:
+                folder_stats_text.value = f"📁 {total_vids} video(s) found inside {sub_dirs} subfolder(s)"
+                folder_stats_text.color = "#38bdf8"
+            else:
+                folder_stats_text.value = "⚠️ 0 video files found. Tap 'Storage Permission' if you have videos on phone."
+                folder_stats_text.color = "#f59e0b"
+        except Exception as ex:
+            folder_stats_text.value = f"⚠️ Permission/Access error: {ex}"
+            folder_stats_text.color = "#ef4444"
+
+    # Android All Files Access Permission launcher
+    def open_storage_settings():
+        commands = [
+            ["am", "start", "-a", "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION", "-d", "package:com.sevenstream.app"],
+            ["am", "start", "-a", "android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION"],
+            ["am", "start", "-a", "android.settings.APPLICATION_DETAILS_SETTINGS", "-d", "package:com.sevenstream.app"],
+        ]
+        opened = False
+        for cmd in commands:
+            try:
+                res = subprocess.run(cmd, check=False, timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if res.returncode == 0:
+                    opened = True
+                    break
+            except Exception:
+                pass
+        notify("Go to Settings > Apps > 7Stream > Permissions > All files access.")
+
     # Quick folder presets for Android and Desktop
     def set_folder_preset(preset_path: str):
         dir_input.value = preset_path
+        update_folder_stats()
         page.update()
         notify(f"Selected: {preset_path}")
 
@@ -1574,19 +1763,24 @@ def build_app(page: ft.Page):
         ft.TextButton("📱 Storage", on_click=lambda e: set_folder_preset(storage_preset)),
     ], wrap=True, spacing=2)
 
-    # In-App Pure-Python Directory Browser (zero native Flutter plugins, 100% Android compatible)
+    storage_perm_btn = ft.OutlinedButton(
+        "🔐 Grant Storage Permission",
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+        on_click=lambda e: open_storage_settings(),
+    )
+
+    # In-App Pure-Python Directory Browser (Shows BOTH folders and video files!)
     folder_dialog = None
     browse_state = {"path": dir_input.value or get_default_media_dir()}
-    folder_list_view = ft.ListView(expand=True, spacing=2, height=240)
+    folder_list_view = ft.ListView(expand=True, spacing=4, height=260)
     current_path_text = ft.Text(size=11, color="#38bdf8", weight=ft.FontWeight.BOLD)
 
     def refresh_folder_list():
         c_path = Path(browse_state["path"]).resolve()
-        current_path_text.value = str(c_path)
         folder_list_view.controls.clear()
 
         # Up one level
-        if c_path.parent != c_path and str(c_path) not in ("/", "C:\\"):
+        if c_path.parent != c_path and str(c_path) not in ("/", "C:" + chr(92)):
             def go_parent(e, p=c_path.parent):
                 browse_state["path"] = str(p)
                 refresh_folder_list()
@@ -1600,10 +1794,15 @@ def build_app(page: ft.Page):
             )
 
         try:
-            entries = sorted(os.scandir(c_path), key=lambda x: x.name.lower())
+            entries = sorted(os.scandir(c_path), key=lambda x: (not x.is_dir(), x.name.lower()))
             found_dirs = 0
+            found_vids = 0
+            found_others = 0
+
             for entry in entries:
-                if entry.is_dir() and not entry.name.startswith("."):
+                if entry.name.startswith("."):
+                    continue
+                if entry.is_dir():
                     found_dirs += 1
                     def on_dir_click(e, d=entry.path):
                         browse_state["path"] = d
@@ -1611,14 +1810,49 @@ def build_app(page: ft.Page):
                         page.update()
                     folder_list_view.controls.append(
                         ft.ListTile(
-                            leading=ft.Icon(ft.Icons.FOLDER, color="#facc15", size=20),
-                            title=ft.Text(entry.name, size=13),
+                            leading=ft.Icon(ft.Icons.FOLDER, color="#facc15", size=22),
+                            title=ft.Text(entry.name, size=13, weight=ft.FontWeight.W_500),
+                            subtitle=ft.Text("Folder • Tap to open", size=10, color="#64748b"),
                             on_click=on_dir_click,
                         )
                     )
-            if found_dirs == 0:
+                elif entry.is_file():
+                    ext = Path(entry.name).suffix.lower()
+                    if ext in VIDEO_EXTENSIONS:
+                        found_vids += 1
+                        try:
+                            f_size = format_size(entry.stat().st_size)
+                        except Exception:
+                            f_size = ""
+                        def on_video_click(e, parent_d=str(c_path)):
+                            dir_input.value = parent_d
+                            if hasattr(page, "pop_dialog"):
+                                try: page.pop_dialog()
+                                except Exception: pass
+                            if folder_dialog: folder_dialog.open = False
+                            update_folder_stats()
+                            page.update()
+                            notify(f"Selected folder: {parent_d}")
+
+                        folder_list_view.controls.append(
+                            ft.ListTile(
+                                leading=ft.Icon(ft.Icons.VIDEO_FILE, color="#38bdf8", size=22),
+                                title=ft.Text(entry.name, size=13, color="#f1f5f9"),
+                                subtitle=ft.Text(f"Video file • {f_size} • Tap to select folder", size=10, color="#38bdf8"),
+                                on_click=on_video_click,
+                            )
+                        )
+                    else:
+                        found_others += 1
+
+            summary_info = f"{c_path} | 📁 {found_dirs} folders • 🎬 {found_vids} video files"
+            if found_others > 0:
+                summary_info += f" • 📄 {found_others} other files"
+            current_path_text.value = summary_info
+
+            if found_dirs == 0 and found_vids == 0:
                 folder_list_view.controls.append(
-                    ft.Text("No subfolders here.", size=12, color="#94a3b8")
+                    ft.Text("No video files or folders found here. Tap 'Up one level' or choose another directory.", size=12, color="#94a3b8")
                 )
         except Exception as ex:
             folder_list_view.controls.append(
@@ -1628,21 +1862,18 @@ def build_app(page: ft.Page):
     def on_select_current_folder(e):
         dir_input.value = browse_state["path"]
         if hasattr(page, "pop_dialog"):
-            try:
-                page.pop_dialog()
-            except Exception:
-                pass
+            try: page.pop_dialog()
+            except Exception: pass
         if folder_dialog:
             folder_dialog.open = False
+        update_folder_stats()
         page.update()
         notify(f"Selected: {dir_input.value}")
 
     def on_cancel_dialog(e):
         if hasattr(page, "pop_dialog"):
-            try:
-                page.pop_dialog()
-            except Exception:
-                pass
+            try: page.pop_dialog()
+            except Exception: pass
         if folder_dialog:
             folder_dialog.open = False
         page.update()
@@ -1664,7 +1895,7 @@ def build_app(page: ft.Page):
                     folder_list_view,
                 ], spacing=6),
                 width=340,
-                height=300,
+                height=320,
             ),
             actions=[
                 ft.TextButton("Cancel", on_click=on_cancel_dialog),
@@ -1686,11 +1917,16 @@ def build_app(page: ft.Page):
         on_click=open_browse_dialog,
     )
 
+    # Initial scan of folder stats
+    update_folder_stats()
+
     config_card = ft.Container(
         content=ft.Column([
             ft.Text("Server Settings", weight=ft.FontWeight.BOLD, size=13, color="#94a3b8"),
             ft.Row([dir_input, browse_btn], spacing=4),
+            folder_stats_text,
             preset_chips,
+            storage_perm_btn,
             ft.Row([
                 port_input,
                 ft.Text(
