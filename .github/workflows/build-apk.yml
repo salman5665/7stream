@@ -64,6 +64,17 @@ jobs:
             -keypass "salmansarod7stream" \
             -dname "CN=Salman Sarod, OU=Mobile Development, O=Salman Sarod, L=Mumbai, ST=Maharashtra, C=IN"
 
+      - name: Configure Gradle Duplicates Strategy
+        run: |
+          mkdir -p ~/.gradle/init.d
+          cat << 'EOF' > ~/.gradle/init.d/duplicates-strategy.gradle
+          allprojects {
+              tasks.withType(Copy).configureEach {
+                  duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+              }
+          }
+          EOF
+
       - name: Build Android Release APK with Flet
         run: |
           flet build apk \
@@ -100,8 +111,7 @@ jobs:
             --skip-flutter-doctor \
             --no-rich-output \
             --yes \
-            . \
-            -- --target-platform android-arm64
+            .
           APK_PATH=$(find build -type f -name "*.apk" | head -n 1)
           if [ -n "$APK_PATH" ]; then
             echo "Found APK at: $APK_PATH"
@@ -144,8 +154,7 @@ jobs:
             --skip-flutter-doctor \
             --no-rich-output \
             --yes \
-            . \
-            -- --target-platform android-arm64
+            .
           AAB_PATH=$(find build -type f -name "*.aab" | head -n 1)
           if [ -n "$AAB_PATH" ]; then
             echo "Found AAB at: $AAB_PATH"
