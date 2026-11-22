@@ -516,16 +516,16 @@ def render_html_page(
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}', '{quote(url_rel)}')">
+                    <button class="btn btn-play" data-url="{stream_url}" data-title="{quote(fname)}" data-rel="{quote(url_rel)}" onclick="handlePlay(this)">
                         ▶ Play
                     </button>
-                    <button class="btn btn-vlc" onclick="openDirectlyInVLC('{full_stream_url}')" title="Play directly in VLC Player">
+                    <button class="btn btn-vlc" data-url="{full_stream_url}" onclick="handleVlc(this)" title="Play directly in VLC Player">
                         🎬 VLC
                     </button>
                     <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
                         ⬇
                     </a>
-                    <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
+                    <button class="btn btn-copy" data-url="{full_stream_url}" onclick="handleCopy(this)" title="Copy VLC Stream URL">
                         🔗 Copy
                     </button>
                 </div>
@@ -647,16 +647,16 @@ def render_html_page(
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}', '{quote(f_rel)}')">
+                    <button class="btn btn-play" data-url="{stream_url}" data-title="{quote(f.name)}" data-rel="{quote(f_rel)}" onclick="handlePlay(this)">
                         ▶ Play
                     </button>
-                    <button class="btn btn-vlc" onclick="openDirectlyInVLC('{full_stream_url}')" title="Play directly in VLC Player">
+                    <button class="btn btn-vlc" data-url="{full_stream_url}" onclick="handleVlc(this)" title="Play directly in VLC Player">
                         🎬 VLC
                     </button>
                     <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
                         ⬇
                     </a>
-                    <button class="btn btn-copy" onclick="copyText('{full_stream_url}')" title="Copy VLC Stream URL">
+                    <button class="btn btn-copy" data-url="{full_stream_url}" onclick="handleCopy(this)" title="Copy VLC Stream URL">
                         🔗 Copy
                     </button>
                 </div>
@@ -715,7 +715,7 @@ def render_html_page(
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>7Stream Media Server</title>
+    <title>7Stream Media Server - by Salman Sarod</title>
     <style>
         :root {{
             --bg: #0b0f19;
@@ -777,6 +777,11 @@ def render_html_page(
             font-size: 1.2rem;
             font-weight: 700;
             color: #ffffff;
+        }}
+        .logo-author {{
+            font-size: 0.76rem;
+            color: var(--primary);
+            font-weight: 500;
         }}
         .view-switcher {{
             display: flex;
@@ -1032,7 +1037,7 @@ def render_html_page(
             border-top: 1px solid var(--border);
             padding: 14px 20px;
             text-align: center;
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             color: var(--text-muted);
             background: var(--surface);
         }}
@@ -1190,6 +1195,7 @@ def render_html_page(
                 <div class="logo-icon">🎬</div>
                 <div>
                     <div class="logo-title">7Stream Server</div>
+                    <div class="logo-author">By Salman Sarod</div>
                 </div>
             </div>
 
@@ -1227,7 +1233,7 @@ def render_html_page(
     </main>
 
     <footer>
-        7Stream Server &bull; Native HTTP Byte-Range Seeking Enabled &bull; Powered by aiohttp & Flet
+        7Stream Server &bull; Developed by Salman Sarod &bull; Ultra-Fast Local LAN &amp; Hotspot Streaming
     </footer>
 
     <!-- Video Player Modal -->
@@ -1281,6 +1287,23 @@ def render_html_page(
     <script>
         let currentVideoUrl = "";
         let currentVideoRel = "";
+
+        function handlePlay(btn) {{
+            const url = btn.getAttribute("data-url");
+            const title = decodeURIComponent(btn.getAttribute("data-title") || "");
+            const rel = decodeURIComponent(btn.getAttribute("data-rel") || "");
+            openPlayer(url, title, rel);
+        }}
+
+        function handleVlc(btn) {{
+            const url = btn.getAttribute("data-url");
+            openDirectlyInVLC(url);
+        }}
+
+        function handleCopy(btn) {{
+            const url = btn.getAttribute("data-url");
+            copyText(url);
+        }}
 
         function openPlayer(url, title, relPath) {{
             currentVideoUrl = window.location.origin + url;
@@ -1412,7 +1435,9 @@ def render_html_page(
             reader.onload = function(e) {{
                 let content = e.target.result;
                 if (file.name.toLowerCase().endsWith(".srt") || !content.startsWith("WEBVTT")) {{
-                    content = "WEBVTT\n\n" + content.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+                    const nl = String.fromCharCode(10);
+                    const vttHeader = ["WEBVTT", "", ""].join(nl);
+                    content = vttHeader + content.replace(new RegExp("(\\d{{2}}:\\d{{2}}:\\d{{2}}),(\\d{{3}})", "g"), "$1.$2");
                 }}
                 const blob = new Blob([content], {{ type: "text/vtt" }});
                 const blobUrl = URL.createObjectURL(blob);
@@ -1452,7 +1477,7 @@ def render_html_page(
         }});
 
         function openDirectlyInVLC(url) {{
-            const cleanUrl = url.replace(/^http:\/\//i, "");
+            const cleanUrl = url.replace("http://", "").replace("https://", "");
             const androidIntent = "intent://" + cleanUrl + "#Intent;scheme=http;package=org.videolan.vlc;type=video/*;end";
             const vlcUri = "vlc://" + url;
 
@@ -1833,7 +1858,7 @@ class VideoServerManager:
 # 5. Modern Flet Mobile GUI Application (Cinematic Dark Redesign)
 # ============================================================================
 def build_app(page: ft.Page):
-    page.title = "7Stream"
+    page.title = "7Stream - by Salman Sarod"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#070a12"
     page.padding = 16
@@ -1848,7 +1873,6 @@ def build_app(page: ft.Page):
 
     # Android background execution & lifecycle management
     def on_app_lifecycle(e):
-        # Prevent Flet or OS from suspending server threads in background
         pass
 
     try:
@@ -1898,13 +1922,11 @@ def build_app(page: ft.Page):
 
     # Robust multi-engine Clipboard Copy
     def copy_to_clipboard(text_val: str):
-        # 1. Asynchronous Flet Clipboard Service
         try:
             page.run_task(clipboard.set, text_val)
         except Exception:
             pass
 
-        # 2. Pyjnius Android native ClipboardManager fallback
         try:
             from jnius import autoclass
             app = None
@@ -1973,7 +1995,6 @@ def build_app(page: ft.Page):
         except Exception:
             pass
 
-        # Fallback: copy link and notify
         copy_to_clipboard(stream_url)
         notify("VLC playlist link copied! Open VLC > Stream to play.")
 
@@ -2022,8 +2043,64 @@ def build_app(page: ft.Page):
             pass
         notify("Phone Settings > Apps > 7Stream > Battery > Set to Unrestricted")
 
+    # Android Direct Storage Permission Request
+    def trigger_direct_permission_request(e=None):
+        try:
+            from jnius import autoclass
+            app = None
+            try:
+                ActivityThread = autoclass("android.app.ActivityThread")
+                app = ActivityThread.currentApplication()
+            except Exception:
+                pass
+            if not app:
+                for act_class in [
+                    "org.kivy.android.PythonActivity",
+                    "com.sevenstream.app.MainActivity",
+                    "io.flutter.embedding.android.FlutterActivity",
+                ]:
+                    try:
+                        act = autoclass(act_class).mActivity
+                        if act:
+                            app = act
+                            break
+                    except Exception:
+                        pass
+            if app:
+                pkg_name = app.getPackageName()
+                Intent = autoclass("android.content.Intent")
+                Settings = autoclass("android.provider.Settings")
+                Uri = autoclass("android.net.Uri")
+                Build = autoclass("android.os.Build")
+
+                # Android 11+ (API 30+) All Files Access Direct System Toggle
+                if Build.VERSION.SDK_INT >= 30:
+                    try:
+                        intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
+                        intent.setData(Uri.parse(f"package:{pkg_name}"))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        app.startActivity(intent)
+                        notify("Please turn 'Allow access to manage all files' ON.")
+                        return
+                    except Exception:
+                        pass
+
+                # App Details Settings (Permissions -> Allow)
+                try:
+                    intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    intent.setData(Uri.parse(f"package:{pkg_name}"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(intent)
+                    notify("Tap 'Permissions' > Allow 'Files and Media'")
+                    return
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        notify("Open Settings > Apps > 7Stream > Permissions > Allow.")
+
     # ──────────────────────────────────────────────────────────────────────────
-    # 1. TOP HEADER & APP BRANDING
+    # 1. TOP HEADER & APP BRANDING (Salman Sarod)
     # ──────────────────────────────────────────────────────────────────────────
     logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
     if logo_path.exists():
@@ -2049,8 +2126,16 @@ def build_app(page: ft.Page):
             ft.Row([
                 brand_icon,
                 ft.Column([
-                    ft.Text("7Stream", size=22, weight=ft.FontWeight.BOLD, color="#ffffff"),
-                    ft.Text("Ultra-Fast LAN Video Server", size=11, color="#38bdf8"),
+                    ft.Row([
+                        ft.Text("7Stream", size=22, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                        ft.Container(
+                            content=ft.Text("PRO", size=10, weight=ft.FontWeight.BOLD, color="#0c4a6e"),
+                            bgcolor="#38bdf8",
+                            padding=ft.Padding(top=2, bottom=2, left=6, right=6),
+                            border_radius=6,
+                        ),
+                    ], spacing=6),
+                    ft.Text("Developed by Salman Sarod", size=11, weight=ft.FontWeight.W_500, color="#38bdf8"),
                 ], spacing=2),
             ], spacing=12),
             status_pill,
@@ -2293,7 +2378,7 @@ def build_app(page: ft.Page):
         except Exception as ex:
             radar_title.value = "Access / Permission Restricted"
             radar_title.color = "#ef4444"
-            radar_subtitle.value = f"Error: {ex}. Enable storage access in Settings."
+            radar_subtitle.value = f"Error: {ex}. Enable storage access below."
 
         page.update()
 
@@ -2462,20 +2547,27 @@ def build_app(page: ft.Page):
         content=ft.Column([
             ft.Row([
                 ft.Icon(ft.Icons.SECURITY, color="#f59e0b", size=18),
-                ft.Text("Storage & Background Streaming Guide", weight=ft.FontWeight.BOLD, size=12, color="#f59e0b"),
+                ft.Text("Storage & Background Permission Guide", weight=ft.FontWeight.BOLD, size=12, color="#f59e0b"),
             ], spacing=6),
-            ft.Text("• Prevent sleep when minimized: Set battery to Unrestricted.", size=11, color="#cbd5e1"),
-            ft.Text("• If 0 videos are detected: Allow 'Files & Media' or 'All Files Access'.", size=11, color="#94a3b8"),
+            ft.Text("• Allow 7Stream to find all video files on your phone.", size=11, color="#cbd5e1"),
+            ft.Text("• Set battery to Unrestricted so streaming never sleeps.", size=11, color="#94a3b8"),
             ft.Row([
                 ft.FilledButton(
-                    "⚡ Keep Alive When Minimized",
+                    "🔑 Grant Storage Access",
+                    bgcolor="#2563eb",
+                    color="#ffffff",
+                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=trigger_direct_permission_request,
+                ),
+                ft.FilledButton(
+                    "⚡ Background Streaming",
                     bgcolor="#1e293b",
                     color="#38bdf8",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
                     on_click=open_battery_settings,
                 ),
                 ft.FilledButton(
-                    "🔄 Rescan Storage",
+                    "🔄 Rescan",
                     bgcolor="#1e293b",
                     color="#ffffff",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
@@ -2573,7 +2665,66 @@ def build_app(page: ft.Page):
     update_folder_stats()
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 7. ASSEMBLE PAGE
+    # 7. FIRST-TIME INSTALL PERMISSION POPUP DIALOG
+    # ──────────────────────────────────────────────────────────────────────────
+    first_launch_perm_dialog = None
+
+    def close_first_perm_dialog(e=None):
+        nonlocal first_launch_perm_dialog
+        if hasattr(page, "pop_dialog"):
+            try: page.pop_dialog()
+            except Exception: pass
+        if first_launch_perm_dialog:
+            first_launch_perm_dialog.open = False
+        update_folder_stats()
+        page.update()
+
+    def on_grant_permission_clicked(e):
+        close_first_perm_dialog()
+        trigger_direct_permission_request()
+
+    first_launch_perm_dialog = ft.AlertDialog(
+        modal=True,
+        title=ft.Row([
+            ft.Icon(ft.Icons.SECURITY_ROUNDED, color="#38bdf8", size=26),
+            ft.Text("Storage Permission", size=16, weight=ft.FontWeight.BOLD, color="#ffffff"),
+        ], spacing=8),
+        content=ft.Container(
+            content=ft.Column([
+                ft.Text("Welcome to 7Stream by Salman Sarod!", size=13, weight=ft.FontWeight.BOLD, color="#38bdf8"),
+                ft.Text(
+                    "To stream videos to your TV or PC, 7Stream needs access to your device storage.",
+                    size=12, color="#cbd5e1",
+                ),
+                ft.Container(height=6),
+                ft.Container(
+                    content=ft.Row([
+                        ft.Icon(ft.Icons.CHECK_CIRCLE, color="#22c55e", size=16),
+                        ft.Text("Tap below to allow storage access directly", size=11, color="#22c55e", weight=ft.FontWeight.W_500),
+                    ], spacing=6),
+                    bgcolor="#052e16",
+                    padding=8,
+                    border_radius=8,
+                    border=make_border("#14532d"),
+                ),
+            ], spacing=6, tight=True),
+            width=310,
+        ),
+        actions=[
+            ft.TextButton("Later", on_click=close_first_perm_dialog),
+            ft.FilledButton(
+                "Allow Storage Access",
+                bgcolor="#2563eb",
+                color="#ffffff",
+                style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                on_click=on_grant_permission_clicked,
+            ),
+        ],
+        actions_alignment=ft.MainAxisAlignment.END,
+    )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 8. ASSEMBLE PAGE
     # ──────────────────────────────────────────────────────────────────────────
     page.add(
         ft.Column([
@@ -2588,6 +2739,27 @@ def build_app(page: ft.Page):
             ),
         ], spacing=14, scroll=ft.ScrollMode.AUTO)
     )
+
+    # Check if this is an Android device with ungranted / restricted storage
+    if is_android:
+        needs_permission = False
+        try:
+            cand_p = Path("/storage/emulated/0/Movies")
+            if not cand_p.exists() or len(list(os.scandir(cand_p))) == 0:
+                # Also check Downloads
+                dl_p = Path("/storage/emulated/0/Download")
+                if not dl_p.exists() or len(list(os.scandir(dl_p))) == 0:
+                    needs_permission = True
+        except Exception:
+            needs_permission = True
+
+        if needs_permission:
+            if hasattr(page, "show_dialog"):
+                page.show_dialog(first_launch_perm_dialog)
+            else:
+                page.dialog = first_launch_perm_dialog
+                first_launch_perm_dialog.open = True
+                page.update()
 
 
 def main(page: ft.Page):

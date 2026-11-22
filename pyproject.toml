@@ -1,3 +1,17 @@
+[project]
+name = "sevenstream"
+version = "1.0.0"
+description = "7Stream - High Speed Local Video Streaming Server by Salman Sarod"
+authors = [
+    { name = "Salman Sarod" }
+]
+
+[tool.flet]
+org = "com.salmansarod"
+product = "7Stream"
+company = "Salman Sarod"
+copyright = "Copyright © 2026 Salman Sarod"
+
 [tool.flet.android.permission]
 "android.permission.INTERNET" = true
 "android.permission.ACCESS_NETWORK_STATE" = true
