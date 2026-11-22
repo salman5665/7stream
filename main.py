@@ -1938,6 +1938,7 @@ def build_app(page: ft.Page):
             if not app:
                 for act_class in [
                     "org.kivy.android.PythonActivity",
+                    "com.salmansarod.sevenstream.MainActivity",
                     "com.sevenstream.app.MainActivity",
                     "io.flutter.embedding.android.FlutterActivity",
                 ]:
@@ -1972,6 +1973,7 @@ def build_app(page: ft.Page):
             if not app:
                 for act_class in [
                     "org.kivy.android.PythonActivity",
+                    "com.salmansarod.sevenstream.MainActivity",
                     "com.sevenstream.app.MainActivity",
                     "io.flutter.embedding.android.FlutterActivity",
                 ]:
@@ -2011,6 +2013,7 @@ def build_app(page: ft.Page):
             if not app:
                 for act_class in [
                     "org.kivy.android.PythonActivity",
+                    "com.salmansarod.sevenstream.MainActivity",
                     "com.sevenstream.app.MainActivity",
                     "io.flutter.embedding.android.FlutterActivity",
                 ]:
@@ -2056,6 +2059,7 @@ def build_app(page: ft.Page):
             if not app:
                 for act_class in [
                     "org.kivy.android.PythonActivity",
+                    "com.salmansarod.sevenstream.MainActivity",
                     "com.sevenstream.app.MainActivity",
                     "io.flutter.embedding.android.FlutterActivity",
                 ]:

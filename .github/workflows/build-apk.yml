@@ -100,7 +100,13 @@ jobs:
             --skip-flutter-doctor \
             --no-rich-output \
             --yes \
-            .
+            . \
+            -- --target-platform android-arm64
+          APK_PATH=$(find build -type f -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            echo "Found APK at: $APK_PATH"
+            cp "$APK_PATH" 7Stream.apk
+          fi
 
       - name: Build Google Play Store App Bundle (AAB) with Flet
         run: |
@@ -108,6 +114,7 @@ jobs:
             --project "sevenstream" \
             --org "com.salmansarod" \
             --product "7Stream" \
+            --arch arm64-v8a \
             --build-number 1 \
             --build-version "1.0.0" \
             --company "Salman Sarod" \
@@ -137,21 +144,17 @@ jobs:
             --skip-flutter-doctor \
             --no-rich-output \
             --yes \
-            .
-
-      - name: Locate Generated Artifacts
-        run: |
-          APK_PATH=$(find build -type f -name "*.apk" | head -n 1)
-          if [ -n "$APK_PATH" ]; then
-            echo "Found APK at: $APK_PATH"
-            cp "$APK_PATH" 7Stream.apk
-          fi
-
+            . \
+            -- --target-platform android-arm64
           AAB_PATH=$(find build -type f -name "*.aab" | head -n 1)
           if [ -n "$AAB_PATH" ]; then
             echo "Found AAB at: $AAB_PATH"
             cp "$AAB_PATH" 7Stream.aab
           fi
+
+      - name: Verify Generated Artifacts
+        run: |
+          ls -lh 7Stream.* || true
 
       - name: Upload APK as Workflow Artifact
         if: hashFiles('7Stream.apk') != ''
