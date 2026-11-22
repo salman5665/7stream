@@ -359,6 +359,89 @@ def format_size(bytes_num: int) -> str:
         return f"{bytes_num / (1024 * 1024 * 1024):.2f} GB"
 
 
+def srt_to_vtt(srt_content: str) -> str:
+    """Converts SubRip (.srt) subtitles into WebVTT (.vtt) format for HTML5 video."""
+    lines = ["WEBVTT", ""]
+    # Replace comma in timestamps: 00:01:20,123 -> 00:01:20.123
+    cleaned = re.sub(r"(\d{2}:\d{2}:\d{2}),(\d{3})", r"\1.\2", srt_content)
+    lines.append(cleaned)
+    return "\n".join(lines)
+
+
+class AndroidWakeLockManager:
+    """Acquires a PARTIAL_WAKE_LOCK and High-Perf WifiLock on Android so streaming continues when minimized or locked."""
+
+    def __init__(self):
+        self.wake_lock = None
+        self.wifi_lock = None
+
+    def _get_app(self):
+        try:
+            from jnius import autoclass
+            try:
+                ActivityThread = autoclass("android.app.ActivityThread")
+                app = ActivityThread.currentApplication()
+                if app:
+                    return app
+            except Exception:
+                pass
+            for act_class in [
+                "org.kivy.android.PythonActivity",
+                "com.sevenstream.app.MainActivity",
+                "io.flutter.embedding.android.FlutterActivity",
+            ]:
+                try:
+                    act = autoclass(act_class).mActivity
+                    if act:
+                        return act
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        return None
+
+    def acquire(self):
+        try:
+            app = self._get_app()
+            if app:
+                from jnius import autoclass
+                Context = autoclass("android.content.Context")
+                # 1. CPU WakeLock (PARTIAL_WAKE_LOCK = 1)
+                try:
+                    pm = app.getSystemService(Context.POWER_SERVICE)
+                    self.wake_lock = pm.newWakeLock(1, "7Stream::BackgroundStreaming")
+                    if self.wake_lock and not self.wake_lock.isHeld():
+                        self.wake_lock.acquire()
+                except Exception:
+                    pass
+
+                # 2. Wi-Fi Lock (WIFI_MODE_FULL_HIGH_PERF = 3)
+                try:
+                    wm = app.getSystemService(Context.WIFI_SERVICE)
+                    self.wifi_lock = wm.createWifiLock(3, "7Stream::WifiLock")
+                    if self.wifi_lock and not self.wifi_lock.isHeld():
+                        self.wifi_lock.acquire()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+    def release(self):
+        try:
+            if self.wake_lock and hasattr(self.wake_lock, "isHeld") and self.wake_lock.isHeld():
+                self.wake_lock.release()
+        except Exception:
+            pass
+        self.wake_lock = None
+
+        try:
+            if self.wifi_lock and hasattr(self.wifi_lock, "isHeld") and self.wifi_lock.isHeld():
+                self.wifi_lock.release()
+        except Exception:
+            pass
+        self.wifi_lock = None
+
+
 def count_videos_in_dir(d_path: Path) -> int:
     """Quickly counts video files directly in or inside d_path."""
     count = 0
@@ -433,8 +516,11 @@ def render_html_page(
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
+                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}', '{quote(url_rel)}')">
                         ▶ Play
+                    </button>
+                    <button class="btn btn-vlc" onclick="openDirectlyInVLC('{full_stream_url}')" title="Play directly in VLC Player">
+                        🎬 VLC
                     </button>
                     <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
                         ⬇
@@ -561,8 +647,11 @@ def render_html_page(
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}')">
+                    <button class="btn btn-play" onclick="openPlayer('{stream_url}', '{safe_name}', '{quote(f_rel)}')">
                         ▶ Play
+                    </button>
+                    <button class="btn btn-vlc" onclick="openDirectlyInVLC('{full_stream_url}')" title="Play directly in VLC Player">
+                        🎬 VLC
                     </button>
                     <a href="{stream_url}" download="{safe_name}" class="btn btn-download" title="Download Video">
                         ⬇
@@ -883,6 +972,7 @@ def render_html_page(
             align-items: center;
             gap: 8px;
             flex-shrink: 0;
+            flex-wrap: wrap;
         }}
         .btn {{
             padding: 7px 12px;
@@ -899,6 +989,15 @@ def render_html_page(
         .btn-play {{
             background: var(--primary);
             color: #0c4a6e;
+        }}
+        .btn-vlc {{
+            background: rgba(249, 115, 22, 0.18);
+            color: #fdba74;
+            border: 1px solid rgba(249, 115, 22, 0.35);
+        }}
+        .btn-vlc:hover {{
+            background: rgba(249, 115, 22, 0.3);
+            color: #ffedd5;
         }}
         .btn-download {{
             background: var(--surface-hover);
@@ -995,6 +1094,54 @@ def render_html_page(
             width: 100%;
             height: 100%;
         }}
+        .modal-track-bar {{
+            background: #0f172a;
+            border-bottom: 1px solid var(--border);
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }}
+        .track-control-group {{
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .track-label {{
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }}
+        .track-select {{
+            background: #1e293b;
+            color: #f1f5f9;
+            border: 1px solid var(--border);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            outline: none;
+            max-width: 220px;
+        }}
+        .track-select:focus {{
+            border-color: var(--primary);
+        }}
+        .btn-sub-load {{
+            background: rgba(56, 189, 248, 0.15);
+            color: #38bdf8;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            padding: 5px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }}
+        .btn-sub-load:hover {{
+            background: rgba(56, 189, 248, 0.25);
+        }}
         .modal-footer {{
             padding: 12px 18px;
             display: flex;
@@ -1003,6 +1150,18 @@ def render_html_page(
             font-size: 0.84rem;
             color: var(--text-muted);
             background: #111827;
+            gap: 12px;
+            flex-wrap: wrap;
+        }}
+        .modal-hint {{
+            font-size: 0.78rem;
+            color: #94a3b8;
+        }}
+        .modal-actions-bar {{
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }}
         .toast {{
             position: fixed;
@@ -1083,9 +1242,36 @@ def render_html_page(
                     Your browser does not support HTML5 video playback.
                 </video>
             </div>
+            <div class="modal-track-bar">
+                <div class="track-control-group" id="audioTrackGroup">
+                    <span class="track-label">🗣️ Audio:</span>
+                    <select id="audioTrackSelect" class="track-select" onchange="onAudioTrackChange()">
+                        <option value="default">Default Audio</option>
+                    </select>
+                </div>
+                <div class="track-control-group">
+                    <span class="track-label">💬 Subtitles:</span>
+                    <select id="subTrackSelect" class="track-select" onchange="onSubTrackChange()">
+                        <option value="off">Subtitles: Off</option>
+                    </select>
+                    <label for="subFileInput" class="btn btn-sub-load" title="Load custom subtitle file from your device">
+                        📂 + Load Subtitle (.srt / .vtt)
+                    </label>
+                    <input type="file" id="subFileInput" accept=".srt,.vtt,.sub" style="display:none" onchange="loadCustomSubtitle(event)">
+                </div>
+            </div>
             <div class="modal-footer">
-                <span>Seeking supported via HTTP 206 Partial Content</span>
-                <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">🔗 Copy Stream Link</button>
+                <div class="modal-hint">
+                    💡 Multi-language MKV? Tap <b>Open in VLC</b> for all audio tracks & embedded subtitles.
+                </div>
+                <div class="modal-actions-bar">
+                    <button class="btn btn-vlc" onclick="openCurrentInVLC()" title="Open directly in VLC Media Player">
+                        🎬 Open in VLC
+                    </button>
+                    <button class="btn btn-copy" id="copyModalBtn" onclick="copyCurrentVideoUrl()">
+                        🔗 Copy Stream Link
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1094,15 +1280,153 @@ def render_html_page(
 
     <script>
         let currentVideoUrl = "";
+        let currentVideoRel = "";
 
-        function openPlayer(url, title) {{
+        function openPlayer(url, title, relPath) {{
             currentVideoUrl = window.location.origin + url;
+            currentVideoRel = relPath || "";
             document.getElementById("playerTitle").innerText = title;
             const video = document.getElementById("htmlPlayer");
+
+            clearVideoTracks();
             video.src = url;
             video.load();
+
             document.getElementById("videoModal").style.display = "flex";
             video.play().catch(e => console.log("Autoplay prevented:", e));
+
+            video.onloadedmetadata = () => {{
+                updateAudioTracks();
+            }};
+
+            fetchSubtitlesForVideo(currentVideoRel);
+        }}
+
+        function clearVideoTracks() {{
+            const video = document.getElementById("htmlPlayer");
+            while (video.querySelector("track")) {{
+                video.removeChild(video.querySelector("track"));
+            }}
+            const subSel = document.getElementById("subTrackSelect");
+            subSel.innerHTML = '<option value="off">Subtitles: Off</option>';
+            const audioSel = document.getElementById("audioTrackSelect");
+            audioSel.innerHTML = '<option value="default">Default Audio</option>';
+        }}
+
+        function updateAudioTracks() {{
+            const video = document.getElementById("htmlPlayer");
+            const sel = document.getElementById("audioTrackSelect");
+            sel.innerHTML = '';
+            if (video.audioTracks && video.audioTracks.length > 0) {{
+                for (let i = 0; i < video.audioTracks.length; i++) {{
+                    const t = video.audioTracks[i];
+                    const opt = document.createElement("option");
+                    opt.value = i;
+                    const langLabel = t.label || t.language || ("Track " + (i + 1));
+                    opt.text = langLabel + (t.enabled ? ' (Active)' : '');
+                    if (t.enabled) opt.selected = true;
+                    sel.appendChild(opt);
+                }}
+            }} else {{
+                const opt = document.createElement("option");
+                opt.value = "default";
+                opt.text = "Default Audio (Use VLC for Dual-Audio)";
+                sel.appendChild(opt);
+            }}
+        }}
+
+        function onAudioTrackChange() {{
+            const video = document.getElementById("htmlPlayer");
+            const sel = document.getElementById("audioTrackSelect");
+            const idx = parseInt(sel.value);
+            if (video.audioTracks && !isNaN(idx)) {{
+                for (let i = 0; i < video.audioTracks.length; i++) {{
+                    video.audioTracks[i].enabled = (i === idx);
+                }}
+                showToast("Switched to audio track " + (idx + 1));
+            }}
+        }}
+
+        function fetchSubtitlesForVideo(relPath) {{
+            if (!relPath) return;
+            const subSel = document.getElementById("subTrackSelect");
+            fetch("/api/subtitles?video=" + encodeURIComponent(relPath))
+                .then(res => res.json())
+                .then(items => {{
+                    if (Array.isArray(items) && items.length > 0) {{
+                        items.forEach(item => {{
+                            const opt = document.createElement("option");
+                            opt.value = item.url;
+                            opt.text = "💬 " + item.label;
+                            subSel.appendChild(opt);
+                        }});
+                        subSel.selectedIndex = 1;
+                        onSubTrackChange();
+                    }}
+                }})
+                .catch(e => console.log("Subtitle discovery note:", e));
+        }}
+
+        function onSubTrackChange() {{
+            const video = document.getElementById("htmlPlayer");
+            const sel = document.getElementById("subTrackSelect");
+            const val = sel.value;
+
+            while (video.querySelector("track")) {{
+                video.removeChild(video.querySelector("track"));
+            }}
+
+            if (val === "off") {{
+                for (let i = 0; i < video.textTracks.length; i++) {{
+                    video.textTracks[i].mode = "disabled";
+                }}
+                showToast("Subtitles turned off");
+                return;
+            }}
+
+            const track = document.createElement("track");
+            track.kind = "subtitles";
+            track.label = sel.options[sel.selectedIndex].text;
+            track.srclang = "en";
+            track.src = val;
+            track.default = true;
+
+            track.onload = function() {{
+                this.track.mode = "showing";
+            }};
+
+            video.appendChild(track);
+            try {{
+                if (video.textTracks.length > 0) {{
+                    video.textTracks[video.textTracks.length - 1].mode = "showing";
+                }}
+            }} catch (e) {{}}
+            showToast("Subtitles loaded: " + sel.options[sel.selectedIndex].text);
+        }}
+
+        function loadCustomSubtitle(event) {{
+            const file = event.target.files && event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {{
+                let content = e.target.result;
+                if (file.name.toLowerCase().endsWith(".srt") || !content.startsWith("WEBVTT")) {{
+                    content = "WEBVTT\n\n" + content.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+                }}
+                const blob = new Blob([content], {{ type: "text/vtt" }});
+                const blobUrl = URL.createObjectURL(blob);
+
+                const subSel = document.getElementById("subTrackSelect");
+                const opt = document.createElement("option");
+                opt.value = blobUrl;
+                opt.text = "📂 " + file.name;
+                subSel.appendChild(opt);
+                subSel.value = blobUrl;
+                onSubTrackChange();
+                showToast("Loaded: " + file.name);
+            }};
+            reader.readAsText(file);
         }}
 
         function closePlayer() {{
@@ -1110,6 +1434,7 @@ def render_html_page(
             const video = document.getElementById("htmlPlayer");
             video.pause();
             video.removeAttribute("src");
+            clearVideoTracks();
             video.load();
             modal.style.display = "none";
         }}
@@ -1126,18 +1451,63 @@ def render_html_page(
             }}
         }});
 
+        function openDirectlyInVLC(url) {{
+            const cleanUrl = url.replace(/^http:\/\//i, "");
+            const androidIntent = "intent://" + cleanUrl + "#Intent;scheme=http;package=org.videolan.vlc;type=video/*;end";
+            const vlcUri = "vlc://" + url;
+
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            if (isAndroid) {{
+                window.location.href = androidIntent;
+                setTimeout(() => {{
+                    window.location.href = vlcUri;
+                }}, 1200);
+            }} else {{
+                window.location.href = vlcUri;
+            }}
+            showToast("Opening VLC Player...");
+        }}
+
+        function openCurrentInVLC() {{
+            if (currentVideoUrl) {{
+                openDirectlyInVLC(currentVideoUrl);
+            }}
+        }}
+
         function copyText(text) {{
-            navigator.clipboard.writeText(text).then(() => {{
-                showToast("Stream URL copied to clipboard!");
-            }}).catch(() => {{
+            if (navigator.clipboard && navigator.clipboard.writeText) {{
+                navigator.clipboard.writeText(text).then(() => {{
+                    showToast("Stream URL copied to clipboard!");
+                }}).catch(() => {{
+                    fallbackCopy(text);
+                }});
+            }} else {{
+                fallbackCopy(text);
+            }}
+        }}
+
+        function fallbackCopy(text) {{
+            let successful = false;
+            try {{
                 const el = document.createElement('textarea');
                 el.value = text;
+                el.setAttribute('readonly', '');
+                el.style.position = 'fixed';
+                el.style.opacity = '0';
+                el.style.left = '-9999px';
                 document.body.appendChild(el);
+                el.focus();
                 el.select();
-                document.execCommand('copy');
+                successful = document.execCommand('copy');
                 document.body.removeChild(el);
+            }} catch (err) {{
+                successful = false;
+            }}
+            if (successful) {{
                 showToast("Stream URL copied to clipboard!");
-            }});
+            }} else {{
+                window.prompt("Copy Video Stream Link:", text);
+            }}
         }}
 
         function copyCurrentVideoUrl() {{
@@ -1173,13 +1543,11 @@ def render_html_page(
 """
 
 
-# ============================================================================
-# 4. Asynchronous Video Streaming Server Manager
-# ============================================================================
 class VideoServerManager:
     """
     Manages the background aiohttp web server inside a dedicated daemon thread.
     Natively supports HTTP 206 Partial Content byte ranges via web.FileResponse.
+    Holds Android WakeLock so streaming persists even when phone is minimized.
     """
 
     def __init__(self):
@@ -1191,6 +1559,7 @@ class VideoServerManager:
         self.runner: web.AppRunner | None = None
         self.is_running: bool = False
         self.start_error: str | None = None
+        self.wakelock = AndroidWakeLockManager()
 
     def set_config(self, media_root_path: str, port: int):
         self.media_root = Path(media_root_path).resolve()
@@ -1209,6 +1578,61 @@ class VideoServerManager:
         except ValueError:
             raise web.HTTPForbidden(text="Access denied: Path traversal detected")
         return target
+
+    async def handle_api_subtitles(self, request: web.Request) -> web.Response:
+        """Returns matching subtitle files in the same directory as the video."""
+        video_rel = unquote(request.query.get("video", ""))
+        if not video_rel:
+            return web.json_response([])
+        try:
+            target_vid = self.resolve_safe_path(video_rel)
+            if not target_vid.exists():
+                return web.json_response([])
+            parent_d = target_vid.parent
+            stem = target_vid.stem.lower()
+            results = []
+            for entry in os.scandir(parent_d):
+                if entry.is_file():
+                    ext = Path(entry.name).suffix.lower()
+                    if ext in (".srt", ".vtt", ".sub"):
+                        rel = Path(entry.path).relative_to(self.media_root)
+                        url_rel = str(rel).replace(chr(92), "/")
+                        label = entry.name
+                        if ".en." in entry.name.lower() or entry.name.lower().endswith("eng.srt"):
+                            label = "English"
+                        elif ".es." in entry.name.lower():
+                            label = "Spanish"
+                        elif ".hi." in entry.name.lower():
+                            label = "Hindi"
+                        results.append({
+                            "label": label,
+                            "url": f"/subtitle/{quote(url_rel)}"
+                        })
+            return web.json_response(results, headers={"Access-Control-Allow-Origin": "*"})
+        except Exception:
+            return web.json_response([])
+
+    async def handle_subtitle(self, request: web.Request) -> web.Response:
+        """Serves WebVTT subtitle stream, converting SubRip (.srt) on the fly."""
+        rel_path = unquote(request.match_info.get("tail", ""))
+        target = self.resolve_safe_path(rel_path)
+        if not target.exists() or not target.is_file():
+            raise web.HTTPNotFound(text="Subtitle not found")
+        try:
+            with open(target, "r", encoding="utf-8", errors="replace") as f:
+                raw_text = f.read()
+            if target.suffix.lower() == ".srt":
+                vtt_text = srt_to_vtt(raw_text)
+            else:
+                vtt_text = raw_text
+            return web.Response(
+                text=vtt_text,
+                content_type="text/vtt",
+                charset="utf-8",
+                headers={"Access-Control-Allow-Origin": "*"},
+            )
+        except Exception as e:
+            raise web.HTTPInternalServerError(text=f"Error reading subtitle: {e}")
 
     async def handle_all_videos(self, request: web.Request) -> web.Response:
         """Serves recursive flat listing of all video files."""
@@ -1354,6 +1778,8 @@ class VideoServerManager:
             app.router.add_get("/browse", self.handle_index)
             app.router.add_get(r"/browse/{tail:.*}", self.handle_browse)
             app.router.add_get(r"/video/{tail:.*}", self.handle_video)
+            app.router.add_get(r"/subtitle/{tail:.*}", self.handle_subtitle)
+            app.router.add_get("/api/subtitles", self.handle_api_subtitles)
             app.router.add_get("/playlist.m3u", self.handle_playlist)
             app.router.add_get("/health", self.handle_health)
 
@@ -1381,6 +1807,7 @@ class VideoServerManager:
 
         startup_event.wait(timeout=3.0)
         if self.is_running:
+            self.wakelock.acquire()
             return True, "Server started successfully"
         return False, self.start_error or "Failed to start server"
 
@@ -1398,6 +1825,7 @@ class VideoServerManager:
         self.loop.call_soon_threadsafe(lambda: asyncio.create_task(shutdown()))
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=2.0)
+        self.wakelock.release()
         self.is_running = False
 
 
@@ -1410,6 +1838,23 @@ def build_app(page: ft.Page):
     page.bgcolor = "#070a12"
     page.padding = 16
     page.scroll = ft.ScrollMode.AUTO
+
+    # Register Flet Clipboard Service
+    clipboard = ft.Clipboard()
+    try:
+        page.services.append(clipboard)
+    except Exception:
+        pass
+
+    # Android background execution & lifecycle management
+    def on_app_lifecycle(e):
+        # Prevent Flet or OS from suspending server threads in background
+        pass
+
+    try:
+        page.on_app_lifecycle_state_change = on_app_lifecycle
+    except Exception:
+        pass
 
     server = VideoServerManager()
     active_mode = "hotspot"  # 'hotspot' or 'wifi'
@@ -1428,13 +1873,6 @@ def build_app(page: ft.Page):
         except Exception:
             pass
         return None
-
-    # Safe cross-version padding helper
-    def make_padding(top=0, bottom=0, left=0, right=0):
-        try:
-            return ft.Padding(top=top, bottom=bottom, left=left, right=right)
-        except Exception:
-            return None
 
     # Snackbar notification
     def notify(msg: str):
@@ -1458,14 +1896,131 @@ def build_app(page: ft.Page):
         except Exception:
             pass
 
-    # Clipboard copy
+    # Robust multi-engine Clipboard Copy
     def copy_to_clipboard(text_val: str):
+        # 1. Asynchronous Flet Clipboard Service
         try:
-            if hasattr(page, "set_clipboard"):
-                page.set_clipboard(text_val)
+            page.run_task(clipboard.set, text_val)
         except Exception:
             pass
+
+        # 2. Pyjnius Android native ClipboardManager fallback
+        try:
+            from jnius import autoclass
+            app = None
+            try:
+                ActivityThread = autoclass("android.app.ActivityThread")
+                app = ActivityThread.currentApplication()
+            except Exception:
+                pass
+            if not app:
+                for act_class in [
+                    "org.kivy.android.PythonActivity",
+                    "com.sevenstream.app.MainActivity",
+                    "io.flutter.embedding.android.FlutterActivity",
+                ]:
+                    try:
+                        act = autoclass(act_class).mActivity
+                        if act:
+                            app = act
+                            break
+                    except Exception:
+                        pass
+            if app:
+                Context = autoclass("android.content.Context")
+                ClipData = autoclass("android.content.ClipData")
+                cm = app.getSystemService(Context.CLIPBOARD_SERVICE)
+                clip = ClipData.newPlainText("7Stream", text_val)
+                cm.setPrimaryClip(clip)
+        except Exception:
+            pass
+
         notify(f"Copied: {text_val}")
+
+    # Launch VLC Player on Android
+    def launch_vlc_app(stream_url: str):
+        try:
+            from jnius import autoclass
+            app = None
+            try:
+                ActivityThread = autoclass("android.app.ActivityThread")
+                app = ActivityThread.currentApplication()
+            except Exception:
+                pass
+            if not app:
+                for act_class in [
+                    "org.kivy.android.PythonActivity",
+                    "com.sevenstream.app.MainActivity",
+                    "io.flutter.embedding.android.FlutterActivity",
+                ]:
+                    try:
+                        act = autoclass(act_class).mActivity
+                        if act:
+                            app = act
+                            break
+                    except Exception:
+                        pass
+            if app:
+                Intent = autoclass("android.content.Intent")
+                Uri = autoclass("android.net.Uri")
+                intent = Intent(Intent.ACTION_VIEW)
+                intent.setDataAndType(Uri.parse(stream_url), "video/*")
+                intent.setPackage("org.videolan.vlc")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                app.startActivity(intent)
+                notify("Launching VLC Player...")
+                return
+        except Exception:
+            pass
+
+        # Fallback: copy link and notify
+        copy_to_clipboard(stream_url)
+        notify("VLC playlist link copied! Open VLC > Stream to play.")
+
+    # Android Background Battery Optimization Settings
+    def open_battery_settings(e):
+        try:
+            from jnius import autoclass
+            app = None
+            try:
+                ActivityThread = autoclass("android.app.ActivityThread")
+                app = ActivityThread.currentApplication()
+            except Exception:
+                pass
+            if not app:
+                for act_class in [
+                    "org.kivy.android.PythonActivity",
+                    "com.sevenstream.app.MainActivity",
+                    "io.flutter.embedding.android.FlutterActivity",
+                ]:
+                    try:
+                        act = autoclass(act_class).mActivity
+                        if act:
+                            app = act
+                            break
+                    except Exception:
+                        pass
+            if app:
+                Intent = autoclass("android.content.Intent")
+                Settings = autoclass("android.provider.Settings")
+                Uri = autoclass("android.net.Uri")
+                pkg_name = app.getPackageName()
+                try:
+                    intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    intent.setData(Uri.parse(f"package:{pkg_name}"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(intent)
+                    notify("Set 7Stream to Unrestricted in Battery settings")
+                    return
+                except Exception:
+                    intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    app.startActivity(intent)
+                    notify("Set 7Stream to Unrestricted in Battery settings")
+                    return
+        except Exception:
+            pass
+        notify("Phone Settings > Apps > 7Stream > Battery > Set to Unrestricted")
 
     # ──────────────────────────────────────────────────────────────────────────
     # 1. TOP HEADER & APP BRANDING
@@ -1636,16 +2191,23 @@ def build_app(page: ft.Page):
                 "Scan with TV or phone camera to watch directly",
                 size=11, color="#64748b", text_align=ft.TextAlign.CENTER,
             ),
-            ft.Container(height=4),
+            ft.Container(height=6),
             ft.Row([
                 ft.FilledButton(
-                    "🎬  Copy VLC Playlist (.m3u)",
+                    "🎬  Open in VLC App",
+                    bgcolor="#f97316",
+                    color="#ffffff",
+                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=lambda e: launch_vlc_app(f"{url_display.value}/playlist.m3u"),
+                ),
+                ft.FilledButton(
+                    "📋  Copy .m3u Link",
                     bgcolor="#1e293b",
                     color="#38bdf8",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
                     on_click=lambda e: copy_to_clipboard(f"{url_display.value}/playlist.m3u"),
                 ),
-            ], alignment=ft.MainAxisAlignment.CENTER),
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=8),
         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
         bgcolor="#0d1424",
         padding=16,
@@ -1894,27 +2456,32 @@ def build_app(page: ft.Page):
     )
 
     # ──────────────────────────────────────────────────────────────────────────
-    # 5. STORAGE PERMISSION SETUP GUIDE CARD
+    # 5. STORAGE & BACKGROUND STREAMING HELP CARD
     # ──────────────────────────────────────────────────────────────────────────
     perm_guide_card = ft.Container(
         content=ft.Column([
             ft.Row([
                 ft.Icon(ft.Icons.SECURITY, color="#f59e0b", size=18),
-                ft.Text("Android Storage Permission Help", weight=ft.FontWeight.BOLD, size=12, color="#f59e0b"),
+                ft.Text("Storage & Background Streaming Guide", weight=ft.FontWeight.BOLD, size=12, color="#f59e0b"),
             ], spacing=6),
-            ft.Text("If 0 videos are detected, grant permission on your phone:", size=11, color="#cbd5e1"),
-            ft.Text("1. Phone Settings › Apps › 7Stream › Permissions", size=11, color="#94a3b8"),
-            ft.Text("2. Allow 'Photos & Videos' (or 'Files & Media')", size=11, color="#94a3b8"),
-            ft.Text("3. On Android 11+: Settings › Special App Access › All Files Access › Enable 7Stream", size=11, color="#94a3b8"),
+            ft.Text("• Prevent sleep when minimized: Set battery to Unrestricted.", size=11, color="#cbd5e1"),
+            ft.Text("• If 0 videos are detected: Allow 'Files & Media' or 'All Files Access'.", size=11, color="#94a3b8"),
             ft.Row([
                 ft.FilledButton(
-                    "🔄 Rescan Storage Now",
+                    "⚡ Keep Alive When Minimized",
+                    bgcolor="#1e293b",
+                    color="#38bdf8",
+                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=open_battery_settings,
+                ),
+                ft.FilledButton(
+                    "🔄 Rescan Storage",
                     bgcolor="#1e293b",
                     color="#ffffff",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
                     on_click=lambda e: (update_folder_stats(), notify("Rescanned storage.")),
                 ),
-            ], alignment=ft.MainAxisAlignment.END),
+            ], wrap=True, spacing=6, alignment=ft.MainAxisAlignment.END),
         ], spacing=6),
         bgcolor="#14170d",
         padding=12,
@@ -2023,9 +2590,6 @@ def build_app(page: ft.Page):
     )
 
 
-# ============================================================================
-# 6. Application Entry Point (Cross-Version Compatible)
-# ============================================================================
 def main(page: ft.Page):
     build_app(page)
 
