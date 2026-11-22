@@ -53,6 +53,7 @@ jobs:
             --project "sevenstream" \
             --org "com.sevenstream.app" \
             --product "7Stream" \
+            --arch arm64-v8a \
             --permissions photo_library \
             --android-permissions \
               android.permission.INTERNET=true \
