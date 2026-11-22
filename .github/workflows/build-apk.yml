@@ -60,79 +60,92 @@ jobs:
             -dname "CN=Salman Sarod, OU=Mobile Development, O=Salman Sarod, L=Mumbai, ST=Maharashtra, C=IN"
 
       - name: Build Android Release APK with Flet
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flet build apk \
-            --project "sevenstream" \
-            --org "com.salmansarod" \
-            --product "7Stream" \
-            --arch arm64-v8a \
-            --build-number 1 \
-            --build-version "1.0.0" \
-            --company "Salman Sarod" \
-            --copyright "Copyright (c) 2026 Salman Sarod" \
-            --android-signing-key-store release.keystore \
-            --android-signing-key-store-password "salmansarod7stream" \
-            --android-signing-key-password "salmansarod7stream" \
-            --android-signing-key-alias "sevenstream" \
-            --permissions photo_library \
-            --android-permissions \
-              android.permission.INTERNET=true \
-              android.permission.ACCESS_NETWORK_STATE=true \
-              android.permission.ACCESS_WIFI_STATE=true \
-              android.permission.CHANGE_WIFI_STATE=true \
-              android.permission.WAKE_LOCK=true \
-              android.permission.FOREGROUND_SERVICE=true \
-              android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK=true \
-              android.permission.FOREGROUND_SERVICE_DATA_SYNC=true \
-              android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS=true \
-              android.permission.READ_EXTERNAL_STORAGE=true \
-              android.permission.WRITE_EXTERNAL_STORAGE=true \
-              android.permission.MANAGE_EXTERNAL_STORAGE=true \
-              android.permission.READ_MEDIA_VIDEO=true \
-              android.permission.READ_MEDIA_AUDIO=true \
-              android.permission.READ_MEDIA_IMAGES=true \
-              android.permission.ACCESS_MEDIA_LOCATION=true \
-            --skip-flutter-doctor \
-            --no-rich-output \
-            --yes \
-            .
+          for i in 1 2 3; do
+            echo "Attempt $i: Building APK..."
+            flet build apk \
+              --project "sevenstream" \
+              --org "com.salmansarod" \
+              --product "7Stream" \
+              --arch arm64-v8a \
+              --build-number 1 \
+              --build-version "1.0.0" \
+              --company "Salman Sarod" \
+              --copyright "Copyright (c) 2026 Salman Sarod" \
+              --android-signing-key-store release.keystore \
+              --android-signing-key-store-password "salmansarod7stream" \
+              --android-signing-key-password "salmansarod7stream" \
+              --android-signing-key-alias "sevenstream" \
+              --permissions photo_library \
+              --android-permissions \
+                android.permission.INTERNET=true \
+                android.permission.ACCESS_NETWORK_STATE=true \
+                android.permission.ACCESS_WIFI_STATE=true \
+                android.permission.CHANGE_WIFI_STATE=true \
+                android.permission.WAKE_LOCK=true \
+                android.permission.FOREGROUND_SERVICE=true \
+                android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK=true \
+                android.permission.FOREGROUND_SERVICE_DATA_SYNC=true \
+                android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS=true \
+                android.permission.READ_EXTERNAL_STORAGE=true \
+                android.permission.WRITE_EXTERNAL_STORAGE=true \
+                android.permission.MANAGE_EXTERNAL_STORAGE=true \
+                android.permission.READ_MEDIA_VIDEO=true \
+                android.permission.READ_MEDIA_AUDIO=true \
+                android.permission.READ_MEDIA_IMAGES=true \
+                android.permission.ACCESS_MEDIA_LOCATION=true \
+              --skip-flutter-doctor \
+              --no-rich-output \
+              --yes \
+              . \
+              -- --target-platform android-arm64 && break || (echo "Retrying build in 15 seconds..." && sleep 15)
+          done
 
       - name: Build Google Play Store App Bundle (AAB) with Flet
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          flet build aab \
-            --project "sevenstream" \
-            --org "com.salmansarod" \
-            --product "7Stream" \
-            --build-number 1 \
-            --build-version "1.0.0" \
-            --company "Salman Sarod" \
-            --copyright "Copyright (c) 2026 Salman Sarod" \
-            --android-signing-key-store release.keystore \
-            --android-signing-key-store-password "salmansarod7stream" \
-            --android-signing-key-password "salmansarod7stream" \
-            --android-signing-key-alias "sevenstream" \
-            --permissions photo_library \
-            --android-permissions \
-              android.permission.INTERNET=true \
-              android.permission.ACCESS_NETWORK_STATE=true \
-              android.permission.ACCESS_WIFI_STATE=true \
-              android.permission.CHANGE_WIFI_STATE=true \
-              android.permission.WAKE_LOCK=true \
-              android.permission.FOREGROUND_SERVICE=true \
-              android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK=true \
-              android.permission.FOREGROUND_SERVICE_DATA_SYNC=true \
-              android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS=true \
-              android.permission.READ_EXTERNAL_STORAGE=true \
-              android.permission.WRITE_EXTERNAL_STORAGE=true \
-              android.permission.MANAGE_EXTERNAL_STORAGE=true \
-              android.permission.READ_MEDIA_VIDEO=true \
-              android.permission.READ_MEDIA_AUDIO=true \
-              android.permission.READ_MEDIA_IMAGES=true \
-              android.permission.ACCESS_MEDIA_LOCATION=true \
-            --skip-flutter-doctor \
-            --no-rich-output \
-            --yes \
-            .
+          for i in 1 2 3; do
+            echo "Attempt $i: Building AAB..."
+            flet build aab \
+              --project "sevenstream" \
+              --org "com.salmansarod" \
+              --product "7Stream" \
+              --build-number 1 \
+              --build-version "1.0.0" \
+              --company "Salman Sarod" \
+              --copyright "Copyright (c) 2026 Salman Sarod" \
+              --android-signing-key-store release.keystore \
+              --android-signing-key-store-password "salmansarod7stream" \
+              --android-signing-key-password "salmansarod7stream" \
+              --android-signing-key-alias "sevenstream" \
+              --permissions photo_library \
+              --android-permissions \
+                android.permission.INTERNET=true \
+                android.permission.ACCESS_NETWORK_STATE=true \
+                android.permission.ACCESS_WIFI_STATE=true \
+                android.permission.CHANGE_WIFI_STATE=true \
+                android.permission.WAKE_LOCK=true \
+                android.permission.FOREGROUND_SERVICE=true \
+                android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK=true \
+                android.permission.FOREGROUND_SERVICE_DATA_SYNC=true \
+                android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS=true \
+                android.permission.READ_EXTERNAL_STORAGE=true \
+                android.permission.WRITE_EXTERNAL_STORAGE=true \
+                android.permission.MANAGE_EXTERNAL_STORAGE=true \
+                android.permission.READ_MEDIA_VIDEO=true \
+                android.permission.READ_MEDIA_AUDIO=true \
+                android.permission.READ_MEDIA_IMAGES=true \
+                android.permission.ACCESS_MEDIA_LOCATION=true \
+              --skip-flutter-doctor \
+              --no-rich-output \
+              --yes \
+              . && break || (echo "Retrying AAB build in 15 seconds..." && sleep 15)
+          done
 
       - name: Locate Generated Artifacts
         run: |
