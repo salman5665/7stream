@@ -55,7 +55,7 @@ jobs:
       - name: Generate Official Release Keystore
         run: |
           keytool -genkeypair -v \
-            -keystore release.keystore \
+            -keystore "${{ github.workspace }}/release.keystore" \
             -alias sevenstream \
             -keyalg RSA \
             -keysize 2048 \
@@ -64,13 +64,24 @@ jobs:
             -keypass "salmansarod7stream" \
             -dname "CN=Salman Sarod, OU=Mobile Development, O=Salman Sarod, L=Mumbai, ST=Maharashtra, C=IN"
 
-      - name: Configure Gradle Duplicates Strategy
+      - name: Configure Gradle Duplicates Strategy and Keystore
         run: |
           mkdir -p ~/.gradle/init.d
           cat << 'EOF' > ~/.gradle/init.d/duplicates-strategy.gradle
           allprojects {
               tasks.withType(Copy).configureEach {
                   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+              }
+              afterEvaluate { project ->
+                  def ws = System.getenv('GITHUB_WORKSPACE') ?: '.'
+                  def src = new File(ws, 'release.keystore')
+                  if (src.exists()) {
+                      def appDir = new File(project.projectDir, 'app')
+                      if (appDir.exists()) {
+                          new File(appDir, 'release.keystore').bytes = src.bytes
+                      }
+                      new File(project.projectDir, 'release.keystore').bytes = src.bytes
+                  }
               }
           }
           EOF
@@ -86,7 +97,7 @@ jobs:
             --build-version "1.0.0" \
             --company "Salman Sarod" \
             --copyright "Copyright (c) 2026 Salman Sarod" \
-            --android-signing-key-store release.keystore \
+            --android-signing-key-store "${{ github.workspace }}/release.keystore" \
             --android-signing-key-store-password "salmansarod7stream" \
             --android-signing-key-password "salmansarod7stream" \
             --android-signing-key-alias "sevenstream" \
@@ -129,7 +140,7 @@ jobs:
             --build-version "1.0.0" \
             --company "Salman Sarod" \
             --copyright "Copyright (c) 2026 Salman Sarod" \
-            --android-signing-key-store release.keystore \
+            --android-signing-key-store "${{ github.workspace }}/release.keystore" \
             --android-signing-key-store-password "salmansarod7stream" \
             --android-signing-key-password "salmansarod7stream" \
             --android-signing-key-alias "sevenstream" \
