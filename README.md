@@ -1,12 +1,23 @@
 # 7Stream - Android Video Streaming Server
+> **Developed by Salman Sarod**
 
 <p align="center">
   <img src="assets/logo.png" alt="7Stream Logo" width="160" style="border-radius: 28px;" />
 </p>
 
-**7Stream** is a high-performance, standalone Android video-streaming server and mobile GUI application written in Python using **Flet** and **aiohttp**.
+<p align="center">
+  <a href="https://github.com/salman5665/7stream/releases/download/v1.0.0/7Stream.apk">
+    <img src="https://img.shields.io/badge/Download-7Stream%20v1.0.0%20APK-22c55e?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" />
+  </a>
+  <a href="https://github.com/salman5665/7stream/releases/tag/v1.0.0">
+    <img src="https://img.shields.io/badge/Release-v1.0.0-38bdf8?style=for-the-badge&logo=github&logoColor=white" alt="Release v1.0.0" />
+  </a>
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" />
+</p>
 
-It turns an Android smartphone or tablet into a portable, battery-efficient local media streaming server. 7Stream lets laptops, Smart TVs, tablets, and media players (such as VLC, MX Player, and Kodi) stream movies and videos directly from the phone's storage over **direct Mobile Hotspot (completely offline without internet or router)** or over a local **Wi-Fi Router network**.
+**7Stream** is a high-performance, battery-efficient Android video streaming server and mobile GUI application built by **Salman Sarod** using **Python**, **Flet (Flutter runtime)**, and **aiohttp**.
+
+It turns any Android phone or tablet into an ultra-fast, offline local media server. 7Stream allows laptops, Smart TVs, tablets, and media players (such as VLC, MX Player, and Kodi) to seamlessly stream and seek HD/4K videos directly from phone storage over **Mobile Hotspot (100% offline without internet or router)** or over a local **Wi-Fi network**.
 
 ---
 
@@ -69,7 +80,16 @@ pip install -r requirements.txt
 
 There are three ways to run and install 7Stream on your Android device:
 
-### Option 1: Build the Standalone APK (Recommended for Everyday Use)
+### Option 1: Direct Download (Ready-to-Install APK)
+
+Download the official release signed APK directly onto your phone:
+- 👉 **[Download 7Stream.apk (v1.0.0)](https://github.com/salman5665/7stream/releases/download/v1.0.0/7Stream.apk)**
+- Once downloaded, tap the file in your notification bar or Downloads folder to install.
+- On first launch, tap **"ALLOW STORAGE ACCESS"** to grant permission.
+
+---
+
+### Option 2: Build from Source with Flet
 
 Build an APK that installs directly onto your phone like any standard Android app.
 
