@@ -53,7 +53,20 @@ jobs:
             --project "sevenstream" \
             --org "com.sevenstream.app" \
             --product "7Stream" \
-            --android-permissions INTERNET=true ACCESS_WIFI_STATE=true CHANGE_WIFI_STATE=true ACCESS_NETWORK_STATE=true READ_EXTERNAL_STORAGE=true MANAGE_EXTERNAL_STORAGE=true WAKE_LOCK=true \
+            --permissions photo_library \
+            --android-permissions \
+              android.permission.INTERNET=true \
+              android.permission.ACCESS_NETWORK_STATE=true \
+              android.permission.ACCESS_WIFI_STATE=true \
+              android.permission.CHANGE_WIFI_STATE=true \
+              android.permission.WAKE_LOCK=true \
+              android.permission.READ_EXTERNAL_STORAGE=true \
+              android.permission.WRITE_EXTERNAL_STORAGE=true \
+              android.permission.MANAGE_EXTERNAL_STORAGE=true \
+              android.permission.READ_MEDIA_VIDEO=true \
+              android.permission.READ_MEDIA_AUDIO=true \
+              android.permission.READ_MEDIA_IMAGES=true \
+              android.permission.ACCESS_MEDIA_LOCATION=true \
             --skip-flutter-doctor \
             --no-rich-output \
             --yes \

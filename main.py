@@ -1402,13 +1402,13 @@ class VideoServerManager:
 
 
 # ============================================================================
-# 5. Modern Flet Mobile GUI Application
+# 5. Modern Flet Mobile GUI Application (Cinematic Dark Redesign)
 # ============================================================================
 def build_app(page: ft.Page):
     page.title = "7Stream"
     page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#0d1117"
-    page.padding = 14
+    page.bgcolor = "#070a12"
+    page.padding = 16
     page.scroll = ft.ScrollMode.AUTO
 
     server = VideoServerManager()
@@ -1419,7 +1419,6 @@ def build_app(page: ft.Page):
     def make_border(color, width: float = 1.0):
         try:
             if hasattr(ft, "Border"):
-                # Flet 1.x style
                 return ft.Border(
                     top=ft.BorderSide(width, color),
                     right=ft.BorderSide(width, color),
@@ -1437,21 +1436,16 @@ def build_app(page: ft.Page):
         except Exception:
             return None
 
-    # Safe alignment center
-    def get_alignment_center():
-        try:
-            return ft.alignment.center
-        except Exception:
-            pass
-        try:
-            return ft.Alignment(0, 0)
-        except Exception:
-            return None
-
     # Snackbar notification
     def notify(msg: str):
         try:
-            sb = ft.SnackBar(content=ft.Text(msg, color="#ffffff"), bgcolor="#1e293b")
+            sb = ft.SnackBar(content=ft.Text(msg, color="#ffffff", size=13), bgcolor="#1e293b")
+            if hasattr(page, "show_dialog"):
+                try:
+                    page.show_dialog(sb)
+                    return
+                except Exception:
+                    pass
             if hasattr(page, "snack_bar"):
                 page.snack_bar = sb
                 sb.open = True
@@ -1465,138 +1459,121 @@ def build_app(page: ft.Page):
             pass
 
     # Clipboard copy
-    def copy_to_clipboard(text: str):
+    def copy_to_clipboard(text_val: str):
         try:
             if hasattr(page, "set_clipboard"):
-                page.set_clipboard(text)
+                page.set_clipboard(text_val)
         except Exception:
             pass
-        notify(f"Copied: {text}")
+        notify(f"Copied: {text_val}")
 
-    # â”€â”€ Status Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    status_dot = ft.Container(width=12, height=12, border_radius=6, bgcolor="#ef4444")
-    status_text = ft.Text("Server Stopped", color="#ef4444", weight=ft.FontWeight.BOLD, size=15)
-    status_card = ft.Container(
-        content=ft.Row(
-            [status_dot, status_text],
-            alignment=ft.MainAxisAlignment.CENTER,
-            spacing=10,
-        ),
-        bgcolor="#1a0a0a",
-        padding=ft.Padding(top=12, bottom=12, left=16, right=16),
-        border_radius=12,
-        border=make_border("#7f1d1d"),
+    # ──────────────────────────────────────────────────────────────────────────
+    # 1. TOP HEADER & APP BRANDING
+    # ──────────────────────────────────────────────────────────────────────────
+    logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
+    if logo_path.exists():
+        brand_icon = ft.Image(
+            src=str(logo_path), width=44, height=44,
+            border_radius=12, fit=ft.BoxFit.CONTAIN,
+        )
+    else:
+        brand_icon = ft.Text("🎬", size=32)
+
+    status_pill_dot = ft.Container(width=8, height=8, border_radius=4, bgcolor="#94a3b8")
+    status_pill_text = ft.Text("OFFLINE", size=11, weight=ft.FontWeight.BOLD, color="#94a3b8")
+    status_pill = ft.Container(
+        content=ft.Row([status_pill_dot, status_pill_text], spacing=6, alignment=ft.MainAxisAlignment.CENTER),
+        bgcolor="#141c2e",
+        padding=ft.Padding(top=6, bottom=6, left=12, right=12),
+        border_radius=20,
+        border=make_border("#233554"),
     )
 
-    # â”€â”€ Mode Selector (custom tabs - no SegmentedButton) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    # Using simple ElevatedButton pair so there's no serialization risk
+    top_header = ft.Container(
+        content=ft.Row([
+            ft.Row([
+                brand_icon,
+                ft.Column([
+                    ft.Text("7Stream", size=22, weight=ft.FontWeight.BOLD, color="#ffffff"),
+                    ft.Text("Ultra-Fast LAN Video Server", size=11, color="#38bdf8"),
+                ], spacing=2),
+            ], spacing=12),
+            status_pill,
+        ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+        padding=ft.Padding(top=4, bottom=8, left=0, right=0),
+    )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 2. CONNECTION MODE TOGGLE (Hotspot vs Wi-Fi)
+    # ──────────────────────────────────────────────────────────────────────────
     mode_hotspot_btn = ft.FilledButton(
-        "ðŸ“¡  Hotspot Mode",
-        bgcolor="#1d4ed8",
+        "📡  Offline Hotspot",
+        bgcolor="#2563eb",
         color="#ffffff",
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
         expand=True,
     )
     mode_wifi_btn = ft.FilledButton(
-        "ðŸŒ  Wi-Fi Mode",
-        bgcolor="#1e293b",
+        "📶  Home Wi-Fi",
+        bgcolor="#141c2e",
         color="#94a3b8",
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=10)),
         expand=True,
     )
 
-    def select_mode(mode: str):
+    mode_tip_text = ft.Text(
+        "Works 100% offline without mobile data or internet router.",
+        size=11, color="#64748b", text_align=ft.TextAlign.CENTER,
+    )
+
+    def select_mode(m: str):
         nonlocal active_mode, current_detected_ip
-        active_mode = mode
+        active_mode = m
         current_detected_ip = detect_ip(active_mode)
-        if mode == "hotspot":
-            mode_hotspot_btn.bgcolor = "#1d4ed8"
+        if m == "hotspot":
+            mode_hotspot_btn.bgcolor = "#2563eb"
             mode_hotspot_btn.color = "#ffffff"
-            mode_wifi_btn.bgcolor = "#1e293b"
+            mode_wifi_btn.bgcolor = "#141c2e"
             mode_wifi_btn.color = "#94a3b8"
+            mode_tip_text.value = "Works 100% offline without mobile data. Connect TV/PC to phone's hotspot."
         else:
-            mode_wifi_btn.bgcolor = "#1d4ed8"
+            mode_wifi_btn.bgcolor = "#2563eb"
             mode_wifi_btn.color = "#ffffff"
-            mode_hotspot_btn.bgcolor = "#1e293b"
+            mode_hotspot_btn.bgcolor = "#141c2e"
             mode_hotspot_btn.color = "#94a3b8"
-        update_guide_card()
+            mode_tip_text.value = "Connect phone and TV/PC to the same Wi-Fi router network."
         update_url_and_qr()
         page.update()
 
     mode_hotspot_btn.on_click = lambda e: select_mode("hotspot")
     mode_wifi_btn.on_click = lambda e: select_mode("wifi")
 
-    mode_row = ft.Container(
-        content=ft.Row([mode_hotspot_btn, mode_wifi_btn], spacing=8),
-        bgcolor="#111827",
-        padding=ft.Padding(top=8, bottom=8, left=8, right=8),
-        border_radius=12,
-        border=make_border("#1f2937"),
+    mode_card = ft.Container(
+        content=ft.Column([
+            ft.Row([mode_hotspot_btn, mode_wifi_btn], spacing=8),
+            mode_tip_text,
+        ], spacing=8, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        bgcolor="#0d1424",
+        padding=12,
+        border_radius=14,
+        border=make_border("#1a2742"),
     )
 
-    # â”€â”€ Guide Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    guide_title = ft.Text("", weight=ft.FontWeight.BOLD, size=13, color="#38bdf8")
-    guide_body = ft.Column(spacing=5)
-    hotspot_settings_btn = ft.OutlinedButton(
-        "âš™  Open Hotspot Settings",
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
-        on_click=lambda e: open_hotspot_settings(),
-    )
-    guide_container = ft.Container(
-        content=ft.Column([guide_title, guide_body, hotspot_settings_btn], spacing=10),
-        bgcolor="#0f172a",
-        padding=14,
-        border_radius=12,
-        border=make_border("#1e3a5f"),
-    )
-
-    def open_hotspot_settings():
-        try:
-            subprocess.run(
-                ["am", "start", "-a", "android.settings.TETHER_SETTINGS"],
-                check=False, timeout=1.5,
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            )
-        except Exception:
-            pass
-        notify("Open Settings â€º Network â€º Hotspot & tethering")
-
-    def update_guide_card():
-        guide_body.controls.clear()
-        if active_mode == "hotspot":
-            guide_title.value = "📶  Hotspot Guide (No Router / No Internet)"
-            steps = [
-                "1. Turn ON phone's Personal Hotspot (mobile data can stay OFF).",
-                "2. Connect Laptop / TV / Tablet to this phone's hotspot.",
-                "3. Start server then open the URL or scan QR on the client.",
-            ]
-            hotspot_settings_btn.visible = True
-        else:
-            guide_title.value = "ðŸŒ  Wi-Fi Router Guide"
-            steps = [
-                "1. Connect your phone AND the client device to the same Wi-Fi.",
-                "2. Start server then open the URL or scan QR on the client.",
-                "3. No internet needed â€” works over local LAN.",
-            ]
-            hotspot_settings_btn.visible = False
-        for s in steps:
-            guide_body.controls.append(ft.Text(s, size=12, color="#cbd5e1"))
-
-    update_guide_card()
-
-    # â”€â”€ URL + QR Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ──────────────────────────────────────────────────────────────────────────
+    # 3. STREAMING BROADCAST DECK (URL, QR, VLC)
+    # ──────────────────────────────────────────────────────────────────────────
     port_input = ft.TextField(
         label="Port",
         value="8080",
-        width=100,
+        width=90,
         keyboard_type=ft.KeyboardType.NUMBER,
-        text_size=14,
+        text_size=13,
         on_change=lambda e: (_lazy_qr_update()),
     )
 
-    url_text = ft.Text(
+    url_display = ft.Text(
         f"http://{current_detected_ip}:8080",
-        size=15,
+        size=17,
         weight=ft.FontWeight.BOLD,
         color="#38bdf8",
         selectable=True,
@@ -1604,18 +1581,18 @@ def build_app(page: ft.Page):
 
     qr_image = ft.Image(
         src=f"data:image/png;base64,{generate_qr_base64(f'http://{current_detected_ip}:8080')}",
-        width=160,
-        height=160,
+        width=150,
+        height=150,
         fit=ft.BoxFit.CONTAIN,
     )
-    qr_box = ft.Container(
+    qr_card = ft.Container(
         content=qr_image,
         bgcolor="#ffffff",
-        padding=8,
-        border_radius=10,
-        alignment=get_alignment_center(),
-        width=176,
-        height=176,
+        padding=10,
+        border_radius=14,
+        alignment=ft.Alignment(0, 0),
+        width=170,
+        height=170,
     )
 
     def _lazy_qr_update():
@@ -1623,11 +1600,11 @@ def build_app(page: ft.Page):
         page.update()
 
     def update_url_and_qr():
-        port_val = (port_input.value or "8080").strip()
-        full_url = f"http://{current_detected_ip}:{port_val}"
-        url_text.value = full_url
+        port_v = (port_input.value or "8080").strip()
+        full_u = f"http://{current_detected_ip}:{port_v}"
+        url_display.value = full_u
         try:
-            new_b64 = generate_qr_base64(full_url)
+            new_b64 = generate_qr_base64(full_u)
             qr_image.src = f"data:image/png;base64,{new_b64}"
         except Exception:
             pass
@@ -1637,142 +1614,150 @@ def build_app(page: ft.Page):
         current_detected_ip = detect_ip(active_mode)
         update_url_and_qr()
         page.update()
-        notify(f"IP refreshed â†’ {current_detected_ip}")
+        notify(f"IP updated: {current_detected_ip}")
 
     def on_copy_url(e):
-        port_val = (port_input.value or "8080").strip()
-        copy_to_clipboard(f"http://{current_detected_ip}:{port_val}")
+        port_v = (port_input.value or "8080").strip()
+        copy_to_clipboard(f"http://{current_detected_ip}:{port_v}")
 
-    url_card = ft.Container(
+    broadcast_deck = ft.Container(
         content=ft.Column([
-            ft.Text("📡  Streaming Address", size=12, color="#64748b"),
+            ft.Text("BROADCAST ADDRESS", size=10, weight=ft.FontWeight.BOLD, color="#64748b"),
             ft.Row([
-                url_text,
-                ft.IconButton(ft.Icons.COPY, tooltip="Copy URL", on_click=on_copy_url, icon_color="#38bdf8"),
-                ft.IconButton(ft.Icons.REFRESH, tooltip="Re-detect IP", on_click=on_refresh_ip, icon_color="#38bdf8"),
+                url_display,
+                ft.Row([
+                    ft.IconButton(ft.Icons.COPY, tooltip="Copy URL", icon_color="#38bdf8", on_click=on_copy_url),
+                    ft.IconButton(ft.Icons.REFRESH, tooltip="Refresh IP", icon_color="#38bdf8", on_click=on_refresh_ip),
+                ], spacing=0),
             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-            ft.Row([qr_box], alignment=ft.MainAxisAlignment.CENTER),
+            ft.Container(height=4),
+            ft.Row([qr_card], alignment=ft.MainAxisAlignment.CENTER),
             ft.Text(
-                "Scan QR code from TV / Laptop / VLC to connect",
+                "Scan with TV or phone camera to watch directly",
                 size=11, color="#64748b", text_align=ft.TextAlign.CENTER,
             ),
+            ft.Container(height=4),
             ft.Row([
-                ft.OutlinedButton(
-                    "📋  Copy VLC Playlist (.m3u)",
+                ft.FilledButton(
+                    "🎬  Copy VLC Playlist (.m3u)",
+                    bgcolor="#1e293b",
+                    color="#38bdf8",
                     style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
-                    on_click=lambda e: copy_to_clipboard(f"{url_text.value}/playlist.m3u"),
-                )
+                    on_click=lambda e: copy_to_clipboard(f"{url_display.value}/playlist.m3u"),
+                ),
             ], alignment=ft.MainAxisAlignment.CENTER),
-        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
-        bgcolor="#0f172a",
-        padding=14,
-        border_radius=12,
-        border=make_border("#1e3a5f"),
+        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=6),
+        bgcolor="#0d1424",
+        padding=16,
+        border_radius=16,
+        border=make_border("#1e2d4a"),
     )
 
-    # â”€â”€ Config Card (Directory + Port) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ──────────────────────────────────────────────────────────────────────────
+    # 4. MEDIA LIBRARY & VIDEO RADAR
+    # ──────────────────────────────────────────────────────────────────────────
     dir_input = ft.TextField(
         label="Video Folder Path",
         value=get_default_media_dir(),
         expand=True,
-        prefix_icon=ft.Icons.FOLDER_OPEN,
-        text_size=13,
+        prefix_icon=ft.Icons.FOLDER,
+        text_size=12,
         hint_text="/storage/emulated/0/Movies",
+        on_change=lambda e: update_folder_stats(),
     )
 
-    # Live folder video stats & storage permission helper
-    folder_stats_text = ft.Text("Scanning folder...", size=12, color="#94a3b8")
+    # Radar status indicator
+    radar_title = ft.Text("Scanning media...", size=13, weight=ft.FontWeight.BOLD, color="#38bdf8")
+    radar_subtitle = ft.Text("", size=11, color="#64748b")
+    radar_pill = ft.Container(
+        content=ft.Row([
+            ft.Icon(ft.Icons.VIDEOCAM, color="#38bdf8", size=20),
+            ft.Column([radar_title, radar_subtitle], spacing=1, expand=True),
+        ], spacing=10),
+        bgcolor="#10192e",
+        padding=12,
+        border_radius=12,
+        border=make_border("#1e355c"),
+    )
 
     def update_folder_stats():
         p_str = (dir_input.value or "").strip()
         if not p_str:
-            folder_stats_text.value = "⚠️ Please select or type a folder path"
-            folder_stats_text.color = "#ef4444"
+            radar_title.value = "No Folder Selected"
+            radar_title.color = "#ef4444"
+            radar_subtitle.value = "Tap a preset below or type a directory path"
+            page.update()
             return
 
         p = Path(p_str)
         if not p.exists():
-            folder_stats_text.value = f"⚠️ Folder does not exist: {p_str}"
-            folder_stats_text.color = "#ef4444"
-            return
-        if not p.is_dir():
-            folder_stats_text.value = f"⚠️ Path is a file, not a directory: {p_str}"
-            folder_stats_text.color = "#ef4444"
+            radar_title.value = "Folder Not Found"
+            radar_title.color = "#ef4444"
+            radar_subtitle.value = f"Cannot find: {p_str}"
+            page.update()
             return
 
         try:
             direct_vids = 0
-            sub_dirs = 0
+            direct_size = 0
+            sub_count = 0
             for e in os.scandir(p):
                 if e.name.startswith("."):
                     continue
                 if e.is_dir():
-                    sub_dirs += 1
+                    sub_count += 1
                 elif e.is_file() and Path(e.name).suffix.lower() in VIDEO_EXTENSIONS:
                     direct_vids += 1
+                    try:
+                        direct_size += e.stat().st_size
+                    except Exception:
+                        pass
 
             total_vids = count_videos_in_dir(p)
+            size_str = format_size(direct_size)
+
             if direct_vids > 0:
-                folder_stats_text.value = f"🎬 {direct_vids} direct video(s) • {total_vids} total across subfolders"
-                folder_stats_text.color = "#22c55e"
+                radar_title.value = f"🎬 {direct_vids} Videos Ready ({size_str})"
+                radar_title.color = "#22c55e"
+                radar_subtitle.value = f"{total_vids} total videos including {sub_count} subfolders"
             elif total_vids > 0:
-                folder_stats_text.value = f"📁 {total_vids} video(s) found inside {sub_dirs} subfolder(s)"
-                folder_stats_text.color = "#38bdf8"
+                radar_title.value = f"📁 {total_vids} Videos in Subfolders"
+                radar_title.color = "#38bdf8"
+                radar_subtitle.value = f"Found in {sub_count} subfolders. Use 'All Videos' in browser."
             else:
-                folder_stats_text.value = "⚠️ 0 video files found. Tap 'Storage Permission' if you have videos on phone."
-                folder_stats_text.color = "#f59e0b"
+                radar_title.value = "⚠️ 0 Videos Found in Folder"
+                radar_title.color = "#f59e0b"
+                radar_subtitle.value = "If you have movies here, check storage permissions below."
         except Exception as ex:
-            folder_stats_text.value = f"⚠️ Permission/Access error: {ex}"
-            folder_stats_text.color = "#ef4444"
+            radar_title.value = "Access / Permission Restricted"
+            radar_title.color = "#ef4444"
+            radar_subtitle.value = f"Error: {ex}. Enable storage access in Settings."
 
-    # Android All Files Access Permission launcher
-    def open_storage_settings():
-        commands = [
-            ["am", "start", "-a", "android.settings.MANAGE_APP_ALL_FILES_ACCESS_PERMISSION", "-d", "package:com.sevenstream.app"],
-            ["am", "start", "-a", "android.settings.MANAGE_ALL_FILES_ACCESS_PERMISSION"],
-            ["am", "start", "-a", "android.settings.APPLICATION_DETAILS_SETTINGS", "-d", "package:com.sevenstream.app"],
-        ]
-        opened = False
-        for cmd in commands:
-            try:
-                res = subprocess.run(cmd, check=False, timeout=1.5, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                if res.returncode == 0:
-                    opened = True
-                    break
-            except Exception:
-                pass
-        notify("Go to Settings > Apps > 7Stream > Permissions > All files access.")
-
-    # Quick folder presets for Android and Desktop
-    def set_folder_preset(preset_path: str):
-        dir_input.value = preset_path
-        update_folder_stats()
         page.update()
-        notify(f"Selected: {preset_path}")
+
+    # Preset Quick Buttons
+    def set_folder_preset(preset_p: str):
+        dir_input.value = preset_p
+        update_folder_stats()
+        notify(f"Selected: {preset_p}")
 
     is_android = Path("/storage/emulated/0").exists()
-    movies_preset = "/storage/emulated/0/Movies" if is_android else str(Path.home() / "Videos")
-    download_preset = "/storage/emulated/0/Download" if is_android else str(Path.home() / "Downloads")
-    dcim_preset = "/storage/emulated/0/DCIM" if is_android else str(Path.home() / "Pictures")
-    storage_preset = "/storage/emulated/0" if is_android else str(Path.home())
+    movies_p = "/storage/emulated/0/Movies" if is_android else str(Path.home() / "Videos")
+    download_p = "/storage/emulated/0/Download" if is_android else str(Path.home() / "Downloads")
+    dcim_p = "/storage/emulated/0/DCIM" if is_android else str(Path.home() / "Pictures")
+    storage_p = "/storage/emulated/0" if is_android else str(Path.home())
 
-    preset_chips = ft.Row([
-        ft.TextButton("🎬 Movies", on_click=lambda e: set_folder_preset(movies_preset)),
-        ft.TextButton("📥 Download", on_click=lambda e: set_folder_preset(download_preset)),
-        ft.TextButton("📷 DCIM", on_click=lambda e: set_folder_preset(dcim_preset)),
-        ft.TextButton("📱 Storage", on_click=lambda e: set_folder_preset(storage_preset)),
-    ], wrap=True, spacing=2)
+    preset_row = ft.Row([
+        ft.FilledButton("🎬 Movies", bgcolor="#141c2e", color="#cbd5e1", on_click=lambda e: set_folder_preset(movies_p)),
+        ft.FilledButton("📥 Download", bgcolor="#141c2e", color="#cbd5e1", on_click=lambda e: set_folder_preset(download_p)),
+        ft.FilledButton("📷 DCIM", bgcolor="#141c2e", color="#cbd5e1", on_click=lambda e: set_folder_preset(dcim_p)),
+        ft.FilledButton("📱 All Storage", bgcolor="#141c2e", color="#cbd5e1", on_click=lambda e: set_folder_preset(storage_p)),
+    ], wrap=True, spacing=6)
 
-    storage_perm_btn = ft.OutlinedButton(
-        "🔐 Grant Storage Permission",
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
-        on_click=lambda e: open_storage_settings(),
-    )
-
-    # In-App Pure-Python Directory Browser (Shows BOTH folders and video files!)
+    # In-App Pure-Python Directory Explorer
     folder_dialog = None
     browse_state = {"path": dir_input.value or get_default_media_dir()}
-    folder_list_view = ft.ListView(expand=True, spacing=4, height=260)
+    folder_list_view = ft.ListView(expand=True, spacing=4, height=280)
     current_path_text = ft.Text(size=11, color="#38bdf8", weight=ft.FontWeight.BOLD)
 
     def refresh_folder_list():
@@ -1797,7 +1782,6 @@ def build_app(page: ft.Page):
             entries = sorted(os.scandir(c_path), key=lambda x: (not x.is_dir(), x.name.lower()))
             found_dirs = 0
             found_vids = 0
-            found_others = 0
 
             for entry in entries:
                 if entry.name.startswith("."):
@@ -1831,25 +1815,18 @@ def build_app(page: ft.Page):
                                 except Exception: pass
                             if folder_dialog: folder_dialog.open = False
                             update_folder_stats()
-                            page.update()
                             notify(f"Selected folder: {parent_d}")
 
                         folder_list_view.controls.append(
                             ft.ListTile(
                                 leading=ft.Icon(ft.Icons.VIDEO_FILE, color="#38bdf8", size=22),
                                 title=ft.Text(entry.name, size=13, color="#f1f5f9"),
-                                subtitle=ft.Text(f"Video file • {f_size} • Tap to select folder", size=10, color="#38bdf8"),
+                                subtitle=ft.Text(f"Video • {f_size} • Tap to select folder", size=10, color="#38bdf8"),
                                 on_click=on_video_click,
                             )
                         )
-                    else:
-                        found_others += 1
 
-            summary_info = f"{c_path} | 📁 {found_dirs} folders • 🎬 {found_vids} video files"
-            if found_others > 0:
-                summary_info += f" • 📄 {found_others} other files"
-            current_path_text.value = summary_info
-
+            current_path_text.value = f"{c_path} | 📁 {found_dirs} folders • 🎬 {found_vids} videos"
             if found_dirs == 0 and found_vids == 0:
                 folder_list_view.controls.append(
                     ft.Text("No video files or folders found here. Tap 'Up one level' or choose another directory.", size=12, color="#94a3b8")
@@ -1867,7 +1844,6 @@ def build_app(page: ft.Page):
         if folder_dialog:
             folder_dialog.open = False
         update_folder_stats()
-        page.update()
         notify(f"Selected: {dir_input.value}")
 
     def on_cancel_dialog(e):
@@ -1891,7 +1867,7 @@ def build_app(page: ft.Page):
             content=ft.Container(
                 content=ft.Column([
                     current_path_text,
-                    ft.Divider(color="#334155", height=1),
+                    ft.Divider(color="#233554", height=1),
                     folder_list_view,
                 ], spacing=6),
                 width=340,
@@ -1917,38 +1893,62 @@ def build_app(page: ft.Page):
         on_click=open_browse_dialog,
     )
 
-    # Initial scan of folder stats
-    update_folder_stats()
-
-    config_card = ft.Container(
+    # ──────────────────────────────────────────────────────────────────────────
+    # 5. STORAGE PERMISSION SETUP GUIDE CARD
+    # ──────────────────────────────────────────────────────────────────────────
+    perm_guide_card = ft.Container(
         content=ft.Column([
-            ft.Text("Server Settings", weight=ft.FontWeight.BOLD, size=13, color="#94a3b8"),
-            ft.Row([dir_input, browse_btn], spacing=4),
-            folder_stats_text,
-            preset_chips,
-            storage_perm_btn,
             ft.Row([
-                port_input,
-                ft.Text(
-                    "Port to serve on (default 8080).",
-                    size=11, color="#64748b", expand=True,
+                ft.Icon(ft.Icons.SECURITY, color="#f59e0b", size=18),
+                ft.Text("Android Storage Permission Help", weight=ft.FontWeight.BOLD, size=12, color="#f59e0b"),
+            ], spacing=6),
+            ft.Text("If 0 videos are detected, grant permission on your phone:", size=11, color="#cbd5e1"),
+            ft.Text("1. Phone Settings › Apps › 7Stream › Permissions", size=11, color="#94a3b8"),
+            ft.Text("2. Allow 'Photos & Videos' (or 'Files & Media')", size=11, color="#94a3b8"),
+            ft.Text("3. On Android 11+: Settings › Special App Access › All Files Access › Enable 7Stream", size=11, color="#94a3b8"),
+            ft.Row([
+                ft.FilledButton(
+                    "🔄 Rescan Storage Now",
+                    bgcolor="#1e293b",
+                    color="#ffffff",
+                    style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=8)),
+                    on_click=lambda e: (update_folder_stats(), notify("Rescanned storage.")),
                 ),
-            ], spacing=8, alignment=ft.MainAxisAlignment.START),
-        ], spacing=10),
-        bgcolor="#0f172a",
-        padding=14,
+            ], alignment=ft.MainAxisAlignment.END),
+        ], spacing=6),
+        bgcolor="#14170d",
+        padding=12,
         border_radius=12,
-        border=make_border("#1e293b"),
+        border=make_border("#423512"),
     )
 
-    # â”€â”€ Start / Stop Button â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    media_hub_card = ft.Container(
+        content=ft.Column([
+            ft.Text("MEDIA LIBRARY & STORAGE", size=10, weight=ft.FontWeight.BOLD, color="#64748b"),
+            radar_pill,
+            ft.Row([dir_input, browse_btn], spacing=4),
+            preset_row,
+            ft.Row([
+                port_input,
+                ft.Text("Port (default 8080).", size=11, color="#64748b", expand=True),
+            ], spacing=8, alignment=ft.MainAxisAlignment.START),
+            perm_guide_card,
+        ], spacing=10),
+        bgcolor="#0d1424",
+        padding=16,
+        border_radius=16,
+        border=make_border("#1e2d4a"),
+    )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # 6. MAIN POWER / TOGGLE BUTTON
+    # ──────────────────────────────────────────────────────────────────────────
     start_stop_btn = ft.FilledButton(
-        "â–¶   Start Server",
-        bgcolor="#1d4ed8",
+        "▶   START STREAMING SERVER",
+        bgcolor="#2563eb",
         color="#ffffff",
-        width=260,
-        height=48,
-        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=12)),
+        height=52,
+        style=ft.ButtonStyle(shape=ft.RoundedRectangleBorder(radius=14)),
     )
 
     def toggle_server(e):
@@ -1956,41 +1956,42 @@ def build_app(page: ft.Page):
             try:
                 port_num = int((port_input.value or "8080").strip())
             except ValueError:
-                notify("Port must be a number (e.g. 8080)")
+                notify("Port must be a valid number (e.g. 8080)")
                 return
+
             media_path = (dir_input.value or "").strip()
             if not media_path:
-                notify("Please set a video folder path first")
+                notify("Please select a video folder path first")
                 return
 
             server.set_config(media_path, port_num)
             success, msg = server.start()
             if success:
-                status_dot.bgcolor = "#22c55e"
-                status_text.value = f"Server Running  â€¢  {url_text.value}"
-                status_text.color = "#22c55e"
-                status_card.bgcolor = "#052e16"
-                status_card.border = make_border("#14532d")
+                status_pill_dot.bgcolor = "#00e676"
+                status_pill_text.value = "LIVE"
+                status_pill_text.color = "#00e676"
+                status_pill.bgcolor = "#052e16"
+                status_pill.border = make_border("#14532d")
 
-                start_stop_btn.text = "â¹   Stop Server"
-                start_stop_btn.bgcolor = "#b91c1c"
+                start_stop_btn.text = "⏹   STOP SERVER"
+                start_stop_btn.bgcolor = "#dc2626"
 
                 dir_input.disabled = True
                 port_input.disabled = True
                 browse_btn.disabled = True
-                notify("ðŸŸ¢ Server is LIVE â€” connect your client devices now!")
+                notify("🟢 7Stream Server is LIVE! Stream to your TV or laptop now.")
             else:
                 notify(f"Failed to start: {msg}")
         else:
             server.stop()
-            status_dot.bgcolor = "#ef4444"
-            status_text.value = "Server Stopped"
-            status_text.color = "#ef4444"
-            status_card.bgcolor = "#1a0a0a"
-            status_card.border = make_border("#7f1d1d")
+            status_pill_dot.bgcolor = "#94a3b8"
+            status_pill_text.value = "OFFLINE"
+            status_pill_text.color = "#94a3b8"
+            status_pill.bgcolor = "#141c2e"
+            status_pill.border = make_border("#233554")
 
-            start_stop_btn.text = "â–¶   Start Server"
-            start_stop_btn.bgcolor = "#1d4ed8"
+            start_stop_btn.text = "▶   START STREAMING SERVER"
+            start_stop_btn.bgcolor = "#2563eb"
 
             dir_input.disabled = False
             port_input.disabled = False
@@ -2001,37 +2002,22 @@ def build_app(page: ft.Page):
 
     start_stop_btn.on_click = toggle_server
 
-    # â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-    logo_path = Path(__file__).resolve().parent / "assets" / "logo.png"
-    if logo_path.exists():
-        header_icon = ft.Image(
-            src=str(logo_path), width=40, height=40,
-            border_radius=10, fit=ft.BoxFit.CONTAIN,
-        )
-    else:
-        header_icon = ft.Text("ðŸŽ¬", size=32)
+    # Trigger initial scan
+    update_folder_stats()
 
-    header = ft.Row([
-        header_icon,
-        ft.Column([
-            ft.Text("7Stream", size=22, weight=ft.FontWeight.BOLD, color="#f1f5f9"),
-            ft.Text("Hotspot & Wi-Fi Video Server", size=11, color="#475569"),
-        ], spacing=2),
-    ], spacing=12)
-
-    # â”€â”€ Assemble Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ──────────────────────────────────────────────────────────────────────────
+    # 7. ASSEMBLE PAGE
+    # ──────────────────────────────────────────────────────────────────────────
     page.add(
         ft.Column([
-            header,
-            status_card,
-            mode_row,
-            guide_container,
-            url_card,
-            config_card,
+            top_header,
+            mode_card,
+            broadcast_deck,
+            media_hub_card,
             ft.Container(
                 content=start_stop_btn,
-                alignment=get_alignment_center(),
-                padding=make_padding(top=8, bottom=24),
+                alignment=ft.Alignment(0, 0),
+                padding=ft.Padding(top=6, bottom=24, left=0, right=0),
             ),
         ], spacing=14, scroll=ft.ScrollMode.AUTO)
     )
